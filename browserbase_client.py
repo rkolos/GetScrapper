@@ -15,6 +15,8 @@ from typing import Dict, Any, Optional
 import aiohttp
 import json
 import time
+import requests
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -301,3 +303,69 @@ if __name__ == "__main__":
     
     # Раскомментируйте для тестирования
     # asyncio.run(test_browserbase())
+
+
+def fetch_via_browserbase_l3(url: str) -> str | None:
+    """
+    Эскалация Уровня 3 (L3). 
+    Использует БЕССЕССИОННЫЙ эндпоинт /v1/scrape для получения 
+    только текстового контента, обходя JS и защиту.
+    
+    Args:
+        url: URL для получения текста
+        
+    Returns:
+        Текстовое содержимое страницы или None при ошибке
+    """
+    
+    # Получаем ключ из переменных окружения
+    BROWSERBASE_API_KEY = os.environ.get("BROWSERBASE_API_KEY")
+    SCRAPE_ENDPOINT = "https://api.browserbase.com/v1/scrape"
+    
+    if not BROWSERBASE_API_KEY:
+        print("[L3 FATAL] BROWSERBASE_API_KEY не установлен.")
+        return None
+
+    headers = {
+        "Authorization": f"Bearer {BROWSERBASE_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    # Идеальный payload для задачи получения только текста:
+    payload = {
+        "url": url,
+        
+        # 1. Оптимизация: Блокируем ненужные ресурсы
+        "loadOptions": {
+            "blockResources": ["image", "font", "stylesheet", "media"]
+        },
+        
+        # 2. Задача: Получить только текст.
+        # Этот скрипт выполнится на сервере Browserbase ПОСЛЕ рендеринга.
+        "jsScript": "document.body.innerText"
+    }
+
+    try:
+        # Используем таймаут (на случай, если API зависнет)
+        response = requests.post(
+            SCRAPE_ENDPOINT, 
+            headers=headers, 
+            json=payload, 
+            timeout=90  # L3 может быть медленным, даем ему 90 секунд
+        )
+        
+        # Проверяем на ошибки API (401, 403, 429, 500...)
+        response.raise_for_status()
+        
+        # Поскольку мы использовали jsScript, API вернет нам 
+        # чистый результат выполнения этого скрипта (raw text).
+        return response.text
+
+    except requests.exceptions.HTTPError as http_err:
+        # Ошибка аутентификации, нехватки кредитов или ошибка сервера Browserbase
+        print(f"[L3 FATAL] Browserbase API HTTP Error: {http_err} | Response: {http_err.response.text}")
+    except requests.exceptions.RequestException as e:
+        # Сетевая ошибка (Timeout, DNS error, и т.д.)
+        print(f"[L3 FATAL] Browserbase API Network Error: {e}")
+    
+    return None  # Если что-то пошло не так, L3 провалился
