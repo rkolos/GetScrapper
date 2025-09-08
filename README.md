@@ -1,741 +1,285 @@
-# GetScrapper
+# Universal HTML Renderer
 
-cursor/bc-0f7980de-b2a4-44b9-a939-a6dedab11f6d-6d1d
-[![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://python.org)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](tests/)
+Универсальный сервис рендеринга HTML с интеллектуальной эскалацией. Автоматически определяет блокировки анти-бот систем и переключается на более мощные методы рендеринга.
 
-A powerful and flexible web scraping tool for extracting structured data from websites and APIs. GetScrapper provides a comprehensive solution for web scraping with support for various data extraction methods, processing pipelines, and output formats.
+## Архитектура
 
-## Features
+### Уровень 2 (Baseline): Локальный Playwright
+- Основной метод рендеринга
+- Быстрый и бесплатный
+- Работает в Docker контейнере
 
-- **Multiple Parser Support**: HTML parsing with BeautifulSoup and JSON parsing
-- **Flexible Data Extraction**: CSS selectors, XPath, and custom extraction methods
-- **Data Processing**: Automatic cleaning, validation, and transformation
-- **Multiple Output Formats**: CSV, JSON, and custom formats
-- **Session Management**: Advanced HTTP session handling with retries and rate limiting
-- **Configuration System**: Flexible configuration with environment variables and config files
-- **Command Line Interface**: Easy-to-use CLI for quick scraping tasks
-- **Comprehensive Testing**: Full test coverage with unit and integration tests
-- **Error Handling**: Robust error handling and logging
+### Уровень 3 (Fallback): Browserbase
+- Дорогой, но мощный API
+- Используется только при обнаружении блокировок
+- Обходит большинство анти-бот систем
 
-## Installation
+### Движок Детекции
+Анализирует результаты локального рендеринга по 5 правилам:
 
-### From Source
+1. **Анализ заголовка** (высокий приоритет)
+   - Поиск ключевых слов: "Just a moment", "Checking your browser", "Verify you are human"
 
-```bash
-git clone https://github.com/yourusername/getscrapper.git
-cd getscrapper
-pip install -e .
-```
+2. **Анализ URL** (высокий приоритет)
+   - Поиск паттернов челленджей: `/cdn-cgi/`, `/challenge-platform/`, `?chk=`
 
-### Development Installation
+3. **Структурный анализ HTML** (высокий приоритет)
+   - Поиск селекторов блокировщиков: `div[id*="cf-challenge"]`, `iframe[src*="hcaptcha.com"]`
 
-```bash
-git clone https://github.com/yourusername/getscrapper.git
-cd getscrapper
-pip install -e ".[dev]"
-```
+4. **Анализ контента** (средний приоритет)
+   - Поиск фраз: "DDoS protection by Cloudflare", "Protected by Incapsula"
 
-## Quick Start
+5. **Эвристика пустой страницы** (низкий приоритет)
+   - Проверка на очень маленькие страницы (< 500 байт)
 
-### Command Line Usage
-
-```bash
-# Scrape a single URL
-getscrapper scrape https://example.com
-
-# Scrape with CSS selectors
-getscrapper scrape https://example.com --selectors '{"title": "h1", "content": ".content p"}'
-
-# Scrape multiple URLs
-getscrapper scrape-multiple https://example.com https://example.com/page2
-
-# Scrape from file
-echo "https://example.com" > urls.txt
-getscrapper scrape-multiple --file urls.txt
-
-# Save results to file
-getscrapper scrape https://example.com --save --output-format csv
-
-# Extract specific elements
-getscrapper scrape https://example.com --extract-links --extract-images --extract-meta
-```
-
-### Python API Usage
-
-```python
-from getscrapper import Scraper
-
-# Initialize scraper
-scraper = Scraper()
-
-# Scrape a single URL
-results = scraper.scrape_url("https://example.com")
-print(f"Scraped {len(results)} items")
-
-# Scrape with CSS selectors
-selectors = {
-    "title": "h1",
-    "content": ".content p",
-    "prices": ".product .price"
-}
-results = scraper.scrape_url("https://example.com", selectors=selectors)
-
-# Scrape multiple URLs
-urls = ["https://example.com", "https://example.com/page2"]
-results = scraper.scrape_urls(urls)
-
-# Scrape with data processing and saving
-results = scraper.scrape_url(
-    "https://example.com",
-    selectors=selectors,
-    process_data=True,
-    save_data=True,
-    output_format="json"
-)
-```
-
-## Configuration
-
-### Environment Variables
-
-```bash
-export GETSCRAPPER_SESSION_TIMEOUT=30
-export GETSCRAPPER_SESSION_RETRIES=3
-export GETSCRAPPER_SESSION_DELAY=1.0
-export GETSCRAPPER_PARSER_ENCODING=utf-8
-export GETSCRAPPER_PROCESSOR_AUTO_CLEAN=true
-export GETSCRAPPER_STORAGE_CSV_ENCODING=utf-8
-export GETSCRAPPER_LOG_LEVEL=INFO
-```
-
-### Configuration File
-
-```json
-{
-  "session": {
-    "timeout": 30,
-    "retries": 3,
-    "delay": 1.0,
-    "user_agent": "GetScrapper/1.0.0"
-  },
-  "parser": {
-    "html_parser": "lxml",
-    "encoding": "utf-8",
-    "extract_text": true,
-    "clean_text": true
-  },
-  "processor": {
-    "auto_clean": true,
-    "validate_data": true,
-    "transform_dates": true,
-    "extract_numbers": false
-  },
-  "storage": {
-    "csv_encoding": "utf-8",
-    "csv_delimiter": ",",
-    "json_indent": 2
-  },
-  "logging": {
-    "level": "INFO",
-    "log_file": null
-  },
-  "output_dir": "./output",
-  "max_concurrent_requests": 5,
-  "continue_on_error": true
-}
-```
-
-## Advanced Usage
-
-### Custom Parsers
-
-```python
-from getscrapper.parsers import BaseParser
-
-class CustomParser(BaseParser):
-    def parse(self, content, **kwargs):
-        # Custom parsing logic
-        return [{"data": "parsed"}]
-    
-    def _validate_config(self):
-        # Validate configuration
-        pass
-
-# Use custom parser
-scraper = Scraper()
-scraper.custom_parser = CustomParser()
-```
-
-### Data Processing
-
-```python
-from getscrapper.processors import DataProcessor
-
-processor = DataProcessor({
-    "auto_clean": True,
-    "validate_data": True,
-    "transform_dates": True,
-    "extract_numbers": True
-})
-
-# Process data
-processed_data = processor.process(raw_data)
-
-# Filter data
-filtered_data = processor.filter_data(data, {"price": {"min": 10, "max": 100}})
-
-# Group data
-grouped_data = processor.group_data(data, "category")
-
-# Aggregate data
-aggregated = processor.aggregate_data(data, {
-    "price": "avg",
-    "count": "count"
-})
-```
-
-### Custom Storage
-
-```python
-from getscrapper.storage import BaseStorage
-
-class CustomStorage(BaseStorage):
-    def save(self, data, output_path):
-        # Custom saving logic
-        pass
-    
-    def load(self, input_path):
-        # Custom loading logic
-        return []
-
-# Use custom storage
-scraper = Scraper()
-scraper.custom_storage = CustomStorage()
-```
-
-## Examples
-
-### E-commerce Product Scraping
-
-```python
-from getscrapper import Scraper
-
-scraper = Scraper()
-
-# Scrape product information
-selectors = {
-    "name": ".product-title",
-    "price": ".price",
-    "description": ".product-description",
-    "rating": ".rating",
-    "availability": ".availability"
-}
-
-results = scraper.scrape_url(
-    "https://shop.example.com/product/123",
-    selectors=selectors,
-    process_data=True,
-    save_data=True,
-    output_format="csv"
-)
-```
-
-### API Data Extraction
-
-```python
-from getscrapper import Scraper
-
-scraper = Scraper()
-
-# Scrape JSON API
-results = scraper.scrape_url(
-    "https://api.example.com/data",
-    parser_type="json",
-    path="users",
-    extract_arrays=True,
-    process_data=True
-)
-```
-
-### News Article Scraping
-
-```python
-from getscrapper import Scraper
-
-scraper = Scraper()
-
-# Scrape news articles
-results = scraper.scrape_url(
-    "https://news.example.com/article",
-    selectors={
-        "headline": "h1.headline",
-        "author": ".author",
-        "date": ".publish-date",
-        "content": ".article-content p"
-    },
-    extract_meta=True,
-    process_data=True
-)
-```
-
-## Testing
-
-```bash
-# Run all tests
-make test
-
-# Run unit tests only
-make test-unit
-
-# Run integration tests only
-make test-integration
-
-# Run tests with coverage
-make test-cov
-
-# Run specific test file
-pytest tests/unit/test_scraper.py -v
-```
-
-## Development
-
-### Setup Development Environment
-
-```bash
-# Clone repository
-git clone https://github.com/yourusername/getscrapper.git
-cd getscrapper
-
-# Install in development mode
-make install-dev
-
-# Setup pre-commit hooks
-make dev-setup
-```
-
-### Code Quality
-
-```bash
-# Format code
-make format
-
-# Run linting
-make lint
-
-# Run all checks
-make check
-```
-
-### Building
-
-```bash
-# Build package
-make build
-
-# Clean build artifacts
-make clean
-```
-
-## API Reference
-
-### Scraper Class
-
-The main `Scraper` class provides the core functionality for web scraping.
-
-#### Methods
-
-- `scrape_url(url, **kwargs)`: Scrape a single URL
-- `scrape_urls(urls, **kwargs)`: Scrape multiple URLs
-- `scrape_from_file(file_path, **kwargs)`: Scrape URLs from a file
-- `get_scraping_stats()`: Get scraping statistics
-
-#### Parameters
-
-- `url`: URL to scrape
-- `parser_type`: Type of parser ('html' or 'json')
-- `selectors`: CSS selectors for data extraction
-- `extract_links`: Whether to extract links
-- `extract_images`: Whether to extract images
-- `extract_meta`: Whether to extract meta tags
-- `process_data`: Whether to process the data
-- `save_data`: Whether to save the data
-- `output_format`: Output format ('csv' or 'json')
-
-### Configuration Classes
-
-- `SessionConfig`: HTTP session configuration
-- `ParserConfig`: Parser configuration
-- `ProcessorConfig`: Data processor configuration
-- `StorageConfig`: Storage configuration
-- `LoggingConfig`: Logging configuration
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Changelog
-
-### Version 1.0.0
-
-- Initial release
-- HTML and JSON parsing support
-- CSS selector extraction
-- Data processing and validation
-- CSV and JSON output formats
-- Command line interface
-- Comprehensive test suite
-- Configuration system
-- Session management with retries and rate limiting
-
-## Support
-
-For support, please open an issue on GitHub or contact the maintainers.
-
-## Roadmap
-
-- [ ] Selenium integration for JavaScript-heavy sites
-- [ ] Database storage support
-- [ ] Distributed scraping capabilities
-- [ ] Web interface for configuration
-- [ ] Plugin system for custom parsers
-- [ ] Advanced data transformation pipelines
-- [ ] Real-time monitoring and
-Высокопроизводительный микросервис для извлечения и конвертации веб-страниц в формат Markdown с двухэтапной стратегией скрапинга.
-
-## 📋 Описание проекта
-
-GetScrapper — это микросервис на Node.js, который принимает URL веб-страницы и возвращает ее основное содержимое в формате Markdown. Сервис использует интеллектуальную двухэтапную стратегию получения контента для максимальной надежности и обхода анти-бот систем.
-
-### 🎯 Ключевые особенности
-
-- **Двухэтапное получение контента**: Первичная попытка через локальный headless браузер, автоматический fallback на Browserbase.io при обнаружении блокировок
-- **Оптимизация памяти**: Явные механизмы очистки ресурсов и управление параллельной нагрузкой
-- **Высокая производительность**: Ограничение параллельных запросов для стабильности
-- **Чистый Markdown**: Автоматическая очистка от навигационных, рекламных и служебных элементов
-
-## 🏗️ Архитектура
-
-Сервис состоит из двух основных контейнеров:
-
-```
-┌─────────────────────┐    ┌─────────────────────┐
-│   get-scrapper-app  │    │   browser-emulator  │
-│   (Node.js/Express) │◄──►│   (browserless/     │
-│                     │    │    chrome)          │
-└─────────────────────┘    └─────────────────────┘
-           │
-           ▼
-┌─────────────────────┐
-│   Browserbase.io    │
-│   (Fallback API)    │
-└─────────────────────┘
-```
-
-### Схема взаимодействия
-
-```mermaid
-sequenceDiagram
-    participant Client as Клиент
-    participant GetScrapper as GetScrapper Service
-    participant Browser as Локальный браузер
-    participant Browserbase as Browserbase.io API
-
-    Client->>+GetScrapper: GET /scrape?url=...
-    GetScrapper->>+Browser: 1. Попытка получить HTML
-    alt Успешно
-        Browser-->>-GetScrapper: Возвращает HTML
-    else Ошибка навигации ИЛИ Обнаружена блокировка
-        Browser-->>-GetScrapper: Ошибка / HTML с заглушкой
-        GetScrapper->>+Browserbase: 2. Запрос к внешнему сервису
-        Browserbase-->>-GetScrapper: Возвращает HTML
-    end
-    GetScrapper->>GetScrapper: Очистка HTML от мусора
-    GetScrapper->>GetScrapper: Конвертация HTML в Markdown
-    GetScrapper-->>-Client: 200 OK (Markdown текст)
-```
-
-## 🛠️ Технологический стек
-
-- **Веб-фреймворк**: Express.js
-- **Управление браузером**: Puppeteer-core
-- **HTTP-клиент**: axios
-- **HTML в Markdown**: turndown
-- **Очистка HTML**: cheerio
-- **Конфигурация**: dotenv
-- **Логирование**: pino
-- **Ограничение нагрузки**: p-limit
-- **Контейнеризация**: Docker, Docker Compose
-
-## 🚀 Быстрый старт
-
-### Предварительные требования
-
-- Docker и Docker Compose
-- Node.js 18+ (для локальной разработки)
-
-### Установка и запуск
-
-1. **Клонирование репозитория**
-   ```bash
-   git clone <repository-url>
-   cd get-scrapper
-   ```
-
-2. **Настройка переменных окружения**
-   ```bash
-   cp .env.example .env
-   # Отредактируйте .env файл с вашими настройками
-   ```
-
-3. **Запуск через Docker Compose**
-   ```bash
-   docker-compose up -d
-   ```
-
-4. **Проверка работы**
-   ```bash
-   curl "http://localhost:3000/scrape?url=https://example.com"
-   ```
-
-### Локальная разработка
+## Установка
 
 ```bash
 # Установка зависимостей
-npm install
+pip install -r requirements.txt
 
-# Запуск локального браузера
-docker run -d -p 9222:3000 browserless/chrome
+# Установка браузеров Playwright
+playwright install chromium
 
-# Запуск приложения
-npm start
+# Настройка переменных окружения (опционально)
+export BROWSERBASE_API_KEY="your_api_key"
+export BROWSERBASE_PROJECT_ID="your_project_id"
 ```
 
-## 📡 API Документация
+## Использование
 
-### Эндпоинт: `GET /scrape`
+### Python API
 
-Получает HTML-код страницы по указанному URL, очищает его и конвертирует в Markdown.
+```python
+import asyncio
+from main_controller import get_universal_html
 
-#### Параметры запроса
+async def main():
+    result = await get_universal_html("https://example.com")
+    
+    print(f"Source: {result['source']}")  # 'local' или 'browserbase'
+    print(f"Title: {result['page_title']}")
+    print(f"HTML Length: {result['content_length']}")
+    print(f"Render Time: {result['render_time']:.2f}s")
+    
+    if result.get('escalation_reason'):
+        print(f"Escalated: {result['escalation_reason']}")
 
-| Параметр | Тип | Обязательный | Описание |
-|----------|-----|--------------|----------|
-| `url` | string | Да | URL-адрес страницы для скрапинга (должен быть URL-encoded) |
+asyncio.run(main())
+```
 
-#### Примеры запросов
+### CLI Интерфейс
 
 ```bash
-# Простой запрос
-curl "http://localhost:3000/scrape?url=https://example.com"
+# Рендеринг одного URL
+python cli.py https://example.com
 
-# URL с параметрами (требует URL-encoding)
-curl "http://localhost:3000/scrape?url=https%3A//example.com%3Fparam%3Dvalue"
+# С детальным анализом детекции
+python cli.py https://example.com --analysis
+
+# Сохранение HTML в файл
+python cli.py https://example.com --output page.html
+
+# Пакетный рендеринг
+python cli.py --batch urls.txt --output-dir results/
+
+# С Browserbase credentials
+python cli.py https://example.com --browserbase-key YOUR_KEY --browserbase-project YOUR_PROJECT
 ```
 
-#### Ответы
+### Docker
 
-**Успешный ответ (200 OK)**
+```dockerfile
+FROM python:3.11-slim
+
+# Установка системных зависимостей
+RUN apt-get update && apt-get install -y \
+    wget \
+    gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Установка Playwright
+RUN pip install playwright
+RUN playwright install chromium
+RUN playwright install-deps chromium
+
+# Копирование кода
+COPY . /app
+WORKDIR /app
+RUN pip install -r requirements.txt
+
+# Запуск
+CMD ["python", "cli.py"]
 ```
-Content-Type: text/markdown; charset=utf-8
 
-# Заголовок страницы
-
-Основное содержимое страницы в формате Markdown...
-```
-
-**Ошибки**
-
-| Код | Описание |
-|-----|----------|
-| `400 Bad Request` | Параметр `url` отсутствует или имеет невалидный формат |
-| `500 Internal Server Error` | Обе попытки скрапинга (локальная и через Browserbase) провалились |
-| `504 Gateway Timeout` | Один из этапов скрапинга занял слишком много времени |
-
-## ⚙️ Конфигурация
+## Конфигурация
 
 ### Переменные окружения
 
-Создайте файл `.env` в корне проекта:
+- `BROWSERBASE_API_KEY` - API ключ Browserbase
+- `BROWSERBASE_PROJECT_ID` - ID проекта Browserbase
+- `RENDERER_LOG_LEVEL` - Уровень логирования (DEBUG, INFO, WARNING, ERROR)
+- `RENDERER_HEADLESS` - Headless режим браузера (true/false)
+- `RENDERER_TIMEOUT` - Таймаут в миллисекундах
 
-```env
-# Порт приложения
-PORT=3000
+### Настройки в config.py
 
-# Настройки локального браузера
-BROWSER_WS_ENDPOINT=ws://browser:3000
-
-# Настройки Browserbase.io
-BROWSERBASE_PROJECT_ID=your_project_id
-BROWSERBASE_API_TOKEN=your_api_token
-
-# Ограничения производительности
-MAX_CONCURRENT_REQUESTS=5
-REQUEST_TIMEOUT=30000
-
-# Логирование
-LOG_LEVEL=info
-```
-
-### Настройка Browserbase.io
-
-1. Зарегистрируйтесь на [Browserbase.io](https://browserbase.io)
-2. Создайте новый проект
-3. Получите Project ID и API Token
-4. Добавьте их в `.env` файл
-
-## 🔧 Управление памятью и производительностью
-
-### Стратегия управления ресурсами
-
-- **Жизненный цикл страниц**: Каждый запрос создает новую страницу в браузере, которая гарантированно закрывается в блоке `finally`
-- **Ограничение параллелизма**: Использование `p-limit` для контроля количества одновременных запросов
-- **Ручная сборка мусора**: Присвоение `null` большим переменным после обработки
-- **Долгоживущие соединения**: Одно соединение с браузером на весь жизненный цикл приложения
-
-### Мониторинг
-
-Сервис использует структурированное логирование через `pino`:
-
-```json
-{
-  "level": 30,
-  "time": 1640995200000,
-  "msg": "Scraping completed",
-  "url": "https://example.com",
-  "method": "puppeteer",
-  "duration": 1250
+```python
+DEFAULT_CONFIG = {
+    'local_browser': {
+        'headless': True,
+        'timeout': 30000,
+        'wait_after_load': 2,
+    },
+    'detection': {
+        'confidence_threshold': 0.3,
+        'enable_title_check': True,
+        # ... другие настройки
+    }
 }
 ```
 
-## 🐳 Docker
+## Структура проекта
 
-### Структура контейнеров
-
-```yaml
-services:
-  app:
-    build: .
-    ports:
-      - "3000:3000"
-    environment:
-      - BROWSER_WS_ENDPOINT=ws://browser:3000
-    depends_on:
-      - browser
-
-  browser:
-    image: browserless/chrome
-    ports:
-      - "3000:3000"
+```
+universal_renderer/
+├── universal_renderer.py    # Локальный рендеринг (Playwright)
+├── detection_engine.py      # Движок детекции блокировок
+├── browserbase_client.py    # Клиент Browserbase API
+├── main_controller.py       # Главный контроллер
+├── config.py               # Конфигурация
+├── cli.py                  # CLI интерфейс
+├── requirements.txt        # Зависимости
+└── README.md              # Документация
 ```
 
-### Сборка образа
+## Примеры использования
 
-```bash
-# Сборка образа приложения
-docker build -t get-scrapper .
+### Базовый пример
 
-# Запуск всего стека
-docker-compose up -d
+```python
+from main_controller import UniversalRenderer
+
+async def render_website():
+    renderer = UniversalRenderer()
+    result = await renderer.get_universal_html("https://quotes.toscrape.com/js/")
+    
+    if result['source'] == 'local':
+        print("✅ Локальный рендеринг успешен")
+    else:
+        print("🔄 Эскалация на Browserbase")
+        print(f"Причина: {result['escalation_reason']}")
+    
+    return result['html_content']
 ```
 
-## 🧪 Тестирование
+### Пакетная обработка
+
+```python
+import asyncio
+from main_controller import UniversalRenderer
+
+async def batch_render(urls):
+    renderer = UniversalRenderer()
+    results = []
+    
+    for url in urls:
+        result = await renderer.get_universal_html(url)
+        results.append({
+            'url': url,
+            'success': not result.get('error'),
+            'source': result.get('source'),
+            'escalated': result.get('escalation_reason') is not None
+        })
+    
+    return results
+
+urls = [
+    "https://httpbin.org/html",
+    "https://quotes.toscrape.com/js/",
+    "https://example.com"
+]
+
+results = asyncio.run(batch_render(urls))
+```
+
+## Логирование
+
+Система ведет подробные логи:
+
+```
+2024-01-15 10:30:15 - INFO - Starting universal render for URL: https://example.com
+2024-01-15 10:30:15 - INFO - Attempting local render for: https://example.com
+2024-01-15 10:30:17 - INFO - Local render completed: https://example.com -> https://example.com (200) in 2.15s
+2024-01-15 10:30:17 - INFO - Analyzing local render result for blocking detection
+2024-01-15 10:30:17 - INFO - URL: https://example.com | Local render successful.
+2024-01-15 10:30:17 - INFO - Confidence score: 0.00
+```
+
+При эскалации:
+
+```
+2024-01-15 10:30:17 - WARN - URL: https://blocked-site.com | Local render BLOCKED. Escalating to Browserbase.
+2024-01-15 10:30:17 - WARN - Blocking reasons: Blocking keywords in title: Just a moment
+2024-01-15 10:30:17 - WARN - Confidence score: 0.40
+2024-01-15 10:30:17 - INFO - Escalating to Browserbase for: https://blocked-site.com (reason: blocking_detected)
+```
+
+## Тестирование
 
 ```bash
 # Запуск тестов
-npm test
+python -m pytest tests/
 
-# Тестирование с покрытием
-npm run test:coverage
+# Тестирование CLI
+python cli.py https://httpbin.org/html --analysis
 
-# Интеграционные тесты
-npm run test:integration
+# Тестирование пакетного режима
+echo "https://httpbin.org/html" > test_urls.txt
+echo "https://example.com" >> test_urls.txt
+python cli.py --batch test_urls.txt --output-dir test_results/
 ```
 
-## 📊 Мониторинг и логи
+## Производительность
 
-### Метрики производительности
+- **Локальный рендеринг**: ~2-5 секунд на страницу
+- **Browserbase**: ~5-15 секунд на страницу
+- **Детекция блокировок**: <100ms
+- **Память**: ~50-100MB на браузер
 
-- Время ответа на запрос
-- Количество успешных/неуспешных запросов
-- Использование памяти
-- Количество активных соединений
+## Ограничения
 
-### Логирование
+1. **Browserbase**: Требует API ключ и имеет лимиты
+2. **Playwright**: Может быть заблокирован продвинутыми анти-бот системами
+3. **Детекция**: Ложные срабатывания возможны на легитимных страницах
+4. **Производительность**: Один браузер на запрос (можно оптимизировать пулом)
 
-Все операции логируются с различными уровнями детализации:
+## Развитие
 
-- `ERROR`: Критические ошибки
-- `WARN`: Предупреждения (например, fallback на Browserbase)
-- `INFO`: Информационные сообщения
-- `DEBUG`: Детальная отладочная информация
+### Планируемые улучшения
 
-## 🔒 Безопасность
+1. **Пул браузеров** для параллельной обработки
+2. **Кэширование** результатов рендеринга
+3. **Машинное обучение** для улучшения детекции
+4. **Метрики** и мониторинг производительности
+5. **Поддержка других API** (ScrapingBee, ScraperAPI)
 
-- Валидация всех входящих URL
-- Ограничение размера ответов
-- Таймауты для всех внешних запросов
-- Изоляция в Docker контейнерах
+### Добавление новых правил детекции
 
-## 🤝 Разработка
-
-### Структура проекта
-
-```
-get-scrapper/
-├── src/
-│   ├── controllers/     # Обработчики API
-│   ├── services/        # Бизнес-логика
-│   ├── utils/          # Вспомогательные функции
-│   └── config/         # Конфигурация
-├── tests/              # Тесты
-├── docker/             # Docker файлы
-├── .env.example        # Пример конфигурации
-├── docker-compose.yml  # Оркестрация контейнеров
-└── README.md          # Документация
+```python
+# В detection_engine.py
+def _check_custom_blocking(self, html_content: str) -> Dict[str, Any]:
+    """Новое правило детекции"""
+    result = {'blocked': False, 'reasons': []}
+    
+    # Ваша логика детекции
+    if 'custom_blocking_pattern' in html_content:
+        result['blocked'] = True
+        result['reasons'].append("Custom blocking pattern detected")
+    
+    return result
 ```
 
-### Внесение изменений
+## Лицензия
 
-1. Создайте feature branch
-2. Внесите изменения
-3. Добавьте тесты
-4. Убедитесь, что все тесты проходят
-5. Создайте Pull Request
-
-## 📝 Лицензия
-
-Этот проект распространяется под лицензией MIT. См. файл [LICENSE](LICENSE) для подробностей.
-
-## 🆘 Поддержка
-
-При возникновении проблем:
-
-1. Проверьте логи: `docker-compose logs app`
-2. Убедитесь в корректности конфигурации `.env`
-3. Проверьте доступность внешних сервисов
-4. Создайте issue в репозитории
-
-## 🔄 Changelog
-
-### Версия 2.0 (08.09.2025)
-- ✅ Двухэтапная стратегия скрапинга
-- ✅ Интеграция с Browserbase.io
-- ✅ Оптимизация управления памятью
-- ✅ Docker контейнеризация
-- ✅ Структурированное логирование
-
----
-
-**Статус**: В разработке  
-**Версия**: 2.0  
-**Дата**: 08.09.20
+MIT License
