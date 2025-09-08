@@ -1,6 +1,12 @@
 """
 Клиент для Browserbase API (Уровень 3 - Fallback)
 Используется когда локальный браузер заблокирован
+
+Оптимизированная реализация:
+- Использует один POST-запрос для получения текста страницы
+- Блокирует загрузку изображений, шрифтов, стилей и медиа (экономия ресурсов)
+- Выполняет JavaScript для рендеринга динамического контента
+- Возвращает чистый текст страницы через document.body.innerText
 """
 
 import asyncio
@@ -121,7 +127,8 @@ class BrowserbaseClient:
     
     async def fetch_via_browserbase(self, url: str) -> Dict[str, Any]:
         """
-        Основная функция для получения HTML через Browserbase
+        Основная функция для получения текста страницы через Browserbase
+        Использует оптимизированный подход с одним POST-запросом
         
         Args:
             url: URL для рендеринга
@@ -130,39 +137,51 @@ class BrowserbaseClient:
             Словарь с результатами рендеринга
         """
         start_time = time.time()
-        session_id = None
         
         try:
-            # Создаем сессию
-            session_id = await self.create_session()
-            logger.info(f"Created Browserbase session: {session_id}")
+            if not self.session:
+                raise RuntimeError("Client not initialized. Use async context manager.")
             
-            # Переходим на URL
-            await self.navigate_to_url(session_id, url)
-            
-            # Ждем дополнительное время для JS-рендеринга
-            await asyncio.sleep(3)
-            
-            # Получаем содержимое и информацию о странице
-            content_result = await self.get_page_content(session_id)
-            info_result = await self.get_page_info(session_id)
-            
-            render_time = time.time() - start_time
-            
-            result = {
-                'html_content': content_result.get('html', ''),
-                'page_title': info_result.get('title', ''),
-                'final_url': info_result.get('url', url),
-                'status_code': 200,  # Browserbase всегда возвращает 200 при успехе
-                'content_length': len(content_result.get('html', '')),
-                'render_time': render_time,
-                'error': None,
-                'source': 'browserbase'
+            # Оптимизированный payload для быстрого и дешевого получения текста
+            payload = {
+                "url": url,
+                "loadOptions": {
+                    "blockResources": ["image", "font", "stylesheet", "media"]
+                },
+                "jsScript": "document.body.innerText"
             }
             
-            logger.info(f"Browserbase render completed: {url} in {render_time:.2f}s")
-            return result
+            logger.info(f"Fetching page content via Browserbase: {url}")
             
+            # Отправляем один POST-запрос для получения текста страницы
+            async with self.session.post(
+                f"{self.base_url}/sessions",
+                json=payload
+            ) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    raise Exception(f"Failed to fetch page: {response.status} - {error_text}")
+                
+                data = await response.json()
+                page_text = data.get('result', '')
+                
+                render_time = time.time() - start_time
+                
+                result = {
+                    'html_content': page_text,  # Возвращаем чистый текст вместо HTML
+                    'page_title': '',  # Title не доступен в этом подходе
+                    'final_url': url,
+                    'status_code': 200,
+                    'content_length': len(page_text),
+                    'render_time': render_time,
+                    'error': None,
+                    'source': 'browserbase'
+                }
+                
+                logger.info(f"Browserbase render completed: {url} in {render_time:.2f}s")
+                logger.info(f"Retrieved {len(page_text)} characters of text content")
+                return result
+                
         except Exception as e:
             render_time = time.time() - start_time
             error_msg = f"Browserbase render failed: {str(e)}"
@@ -178,16 +197,12 @@ class BrowserbaseClient:
                 'error': error_msg,
                 'source': 'browserbase'
             }
-        
-        finally:
-            # Закрываем сессию
-            if session_id:
-                await self.close_session(session_id)
 
 
 async def fetch_via_browserbase(url: str, api_key: str, project_id: str) -> Dict[str, Any]:
     """
     Удобная функция для рендеринга URL через Browserbase
+    Использует оптимизированный подход с одним POST-запросом
     
     Args:
         url: URL для рендеринга
@@ -197,8 +212,72 @@ async def fetch_via_browserbase(url: str, api_key: str, project_id: str) -> Dict
     Returns:
         Словарь с результатами рендеринга
     """
-    async with BrowserbaseClient(api_key, project_id) as client:
-        return await client.fetch_via_browserbase(url)
+    start_time = time.time()
+    
+    try:
+        # Создаем сессию для одного запроса
+        async with aiohttp.ClientSession(
+            headers={
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json'
+            }
+        ) as session:
+            
+            # Оптимизированный payload для быстрого и дешевого получения текста
+            payload = {
+                "url": url,
+                "loadOptions": {
+                    "blockResources": ["image", "font", "stylesheet", "media"]
+                },
+                "jsScript": "document.body.innerText"
+            }
+            
+            logger.info(f"Fetching page content via Browserbase: {url}")
+            
+            # Отправляем один POST-запрос для получения текста страницы
+            async with session.post(
+                "https://www.browserbase.com/v1/sessions",
+                json=payload
+            ) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    raise Exception(f"Failed to fetch page: {response.status} - {error_text}")
+                
+                data = await response.json()
+                page_text = data.get('result', '')
+                
+                render_time = time.time() - start_time
+                
+                result = {
+                    'html_content': page_text,  # Возвращаем чистый текст вместо HTML
+                    'page_title': '',  # Title не доступен в этом подходе
+                    'final_url': url,
+                    'status_code': 200,
+                    'content_length': len(page_text),
+                    'render_time': render_time,
+                    'error': None,
+                    'source': 'browserbase'
+                }
+                
+                logger.info(f"Browserbase render completed: {url} in {render_time:.2f}s")
+                logger.info(f"Retrieved {len(page_text)} characters of text content")
+                return result
+                
+    except Exception as e:
+        render_time = time.time() - start_time
+        error_msg = f"Browserbase render failed: {str(e)}"
+        logger.error(f"{error_msg} for URL: {url}")
+        
+        return {
+            'html_content': '',
+            'page_title': '',
+            'final_url': url,
+            'status_code': 0,
+            'content_length': 0,
+            'render_time': render_time,
+            'error': error_msg,
+            'source': 'browserbase'
+        }
 
 
 # Пример использования
