@@ -2,6 +2,7 @@
 
 import re
 from typing import Any, Dict, List, Optional, Union
+from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup, Tag
 from lxml import html
@@ -42,6 +43,7 @@ class HTMLParser(BaseParser):
                 - extract_links: Whether to extract links (default: False)
                 - extract_images: Whether to extract images (default: False)
                 - extract_meta: Whether to extract meta tags (default: False)
+                - base_url: Base URL for resolving relative links
                 
         Returns:
             List of extracted data dictionaries
@@ -52,6 +54,7 @@ class HTMLParser(BaseParser):
         try:
             soup = BeautifulSoup(content, self.parser)
             results = []
+            base_url = kwargs.get("base_url", "")
             
             # Extract data based on selectors
             selectors = kwargs.get("selectors", {})
@@ -60,11 +63,11 @@ class HTMLParser(BaseParser):
             
             # Extract links if requested
             if kwargs.get("extract_links", False):
-                results.extend(self._extract_links(soup))
+                results.extend(self._extract_links(soup, base_url))
             
             # Extract images if requested
             if kwargs.get("extract_images", False):
-                results.extend(self._extract_images(soup))
+                results.extend(self._extract_images(soup, base_url))
             
             # Extract meta tags if requested
             if kwargs.get("extract_meta", False):
@@ -97,16 +100,24 @@ class HTMLParser(BaseParser):
         
         return results
 
-    def _extract_links(self, soup: BeautifulSoup) -> List[Dict[str, Any]]:
+    def _extract_links(self, soup: BeautifulSoup, base_url: str = "") -> List[Dict[str, Any]]:
         """Extract all links from the page."""
         results = []
         links = soup.find_all("a", href=True)
         
         for link in links:
+            href = link.get("href")
+            # Normalize relative URLs to absolute URLs
+            if base_url and href:
+                full_url = urljoin(base_url, href)
+            else:
+                full_url = href
+            
             data = {
                 "type": "link",
                 "text": self._clean_text_content(link.get_text()) if self.clean_text else link.get_text(),
-                "url": link.get("href"),
+                "url": href,  # Original href
+                "full_url": full_url,  # Resolved absolute URL
                 "title": link.get("title", ""),
                 "attributes": dict(link.attrs),
             }
@@ -114,15 +125,23 @@ class HTMLParser(BaseParser):
         
         return results
 
-    def _extract_images(self, soup: BeautifulSoup) -> List[Dict[str, Any]]:
+    def _extract_images(self, soup: BeautifulSoup, base_url: str = "") -> List[Dict[str, Any]]:
         """Extract all images from the page."""
         results = []
         images = soup.find_all("img")
         
         for img in images:
+            src = img.get("src", "")
+            # Normalize relative image URLs to absolute URLs
+            if base_url and src:
+                full_src = urljoin(base_url, src)
+            else:
+                full_src = src
+            
             data = {
                 "type": "image",
-                "src": img.get("src", ""),
+                "src": src,  # Original src
+                "full_src": full_src,  # Resolved absolute URL
                 "alt": img.get("alt", ""),
                 "title": img.get("title", ""),
                 "width": img.get("width", ""),

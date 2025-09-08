@@ -17,7 +17,7 @@ class TestSessionManager:
         assert session.timeout == 30
         assert session.retries == 3
         assert session.backoff_factor == 0.3
-        assert session.user_agent == "GetScrapper/1.0.0"
+        assert session.user_agent == "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
         assert session.delay == 1
         assert session.verify_ssl is True
 

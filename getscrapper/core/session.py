@@ -38,7 +38,7 @@ class SessionManager:
         self.timeout = self.config.get("timeout", 30)
         self.retries = self.config.get("retries", 3)
         self.backoff_factor = self.config.get("backoff_factor", 0.3)
-        self.user_agent = self.config.get("user_agent", "GetScrapper/1.0.0")
+        self.user_agent = self.config.get("user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36")
         self.headers = self.config.get("headers", {})
         self.cookies = self.config.get("cookies", {})
         self.proxies = self.config.get("proxies", {})
