@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
     ca-certificates \
+    curl \
     fonts-liberation \
     libasound2 \
     libatk-bridge2.0-0 \
@@ -53,5 +54,5 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/home/renderer/.cache/ms-playwright
 # Экспорт порта (если нужен веб-сервер)
 EXPOSE 8000
 
-# Команда по умолчанию
-CMD ["python3", "cli.py", "--help"]
+# Команда по умолчанию (API сервер)
+CMD ["python3", "api_server.py"]

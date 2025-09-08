@@ -1,10 +1,10 @@
-# Makefile for GetScrapper
+# Makefile for Universal HTML Renderer
 
-.PHONY: help install install-dev test test-unit test-integration test-cov lint format clean build docs
+.PHONY: help install install-dev test test-unit test-integration test-cov lint format clean build docs api-start api-stop api-test api-logs
 
 help: ## Show this help message
-	@echo "GetScrapper - Web Scraping Tool"
-	@echo "================================"
+	@echo "Universal HTML Renderer - API Service"
+	@echo "====================================="
 	@echo ""
 	@echo "Available commands:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -104,3 +104,50 @@ release-major: ## Release major version
 	bump2version major
 	git push --tags
 	git push
+
+# API Service commands
+api-start: ## Start API server with Docker Compose
+	docker-compose up -d api-server
+
+api-stop: ## Stop API server
+	docker-compose down
+
+api-restart: ## Restart API server
+	docker-compose restart api-server
+
+api-logs: ## Show API server logs
+	docker-compose logs -f api-server
+
+api-test: ## Test API server
+	python test_api.py
+
+api-examples: ## Run API examples
+	python api_examples.py
+
+api-dev: ## Start API server in development mode
+	python api_server.py
+
+# CLI commands
+cli-help: ## Show CLI help
+	python cli.py --help
+
+cli-scrape: ## Scrape single URL (usage: make cli-scrape URL=https://example.com)
+	python cli.py $(URL)
+
+cli-batch: ## Batch scrape URLs from file (usage: make cli-batch FILE=urls.txt)
+	python cli.py --batch $(FILE)
+
+# Docker commands
+docker-build: ## Build Docker image
+	docker-compose build
+
+docker-clean: ## Clean Docker containers and images
+	docker-compose down --rmi all --volumes --remove-orphans
+
+# Development commands
+dev-install: ## Install development dependencies
+	pip install -r requirements.txt
+
+dev-test: ## Run all tests
+	python test_api.py
+	python test_system.py

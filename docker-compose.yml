@@ -1,9 +1,10 @@
 version: '3.8'
 
 services:
-  universal-renderer:
+  # API сервер (основной сервис)
+  api-server:
     build: .
-    container_name: universal-renderer
+    container_name: universal-renderer-api
     environment:
       # Настройки рендерера
       - RENDERER_LOG_LEVEL=INFO
@@ -18,9 +19,49 @@ services:
       - ./output:/app/output
       - ./logs:/app/logs
     ports:
-      # Если нужен веб-интерфейс
+      # API сервер
       - "8000:8000"
     restart: unless-stopped
+    
+    # Ограничения ресурсов
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
+    
+    # Команда запуска API сервера
+    command: ["python3", "api_server.py"]
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # CLI сервис (для пакетной обработки)
+  cli-service:
+    build: .
+    container_name: universal-renderer-cli
+    environment:
+      # Настройки рендерера
+      - RENDERER_LOG_LEVEL=INFO
+      - RENDERER_HEADLESS=true
+      - RENDERER_TIMEOUT=30000
+      
+      # Browserbase credentials (замените на ваши)
+      # - BROWSERBASE_API_KEY=your_api_key_here
+      # - BROWSERBASE_PROJECT_ID=your_project_id_here
+    volumes:
+      # Монтирование для сохранения результатов
+      - ./output:/app/output
+      - ./logs:/app/logs
+    restart: "no"
     
     # Ограничения ресурсов
     deploy:
@@ -32,22 +73,9 @@ services:
           memory: 512M
           cpus: '0.5'
     
-    # Команда по умолчанию
+    # Команда по умолчанию (показывает справку)
     command: ["python3", "cli.py", "--help"]
-
-  # Опциональный веб-сервер для API
-  web-server:
-    build: .
-    container_name: renderer-web-server
-    environment:
-      - RENDERER_LOG_LEVEL=INFO
-      - RENDERER_HEADLESS=true
-      - RENDERER_TIMEOUT=30000
-    ports:
-      - "8001:8000"
-    volumes:
-      - ./output:/app/output
-    restart: unless-stopped
-    command: ["python3", "-m", "http.server", "8000"]
+    
+    # Запускается только при необходимости
     profiles:
-      - web
+      - cli
