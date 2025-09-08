@@ -9,6 +9,7 @@ from typing import Dict, Any, Optional
 from playwright.async_api import async_playwright, Browser, Page
 import time
 from urllib.parse import urlparse
+from config import config
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -18,32 +19,32 @@ logger = logging.getLogger(__name__)
 class LocalRenderer:
     """Класс для рендеринга страниц через локальный Playwright браузер"""
     
-    def __init__(self, headless: bool = True, timeout: int = 30000):
+    def __init__(self, headless: bool = True, timeout: int = 30000, reuse_context: bool = False):
         self.headless = headless
         self.timeout = timeout
+        self.reuse_context = reuse_context
         self.browser: Optional[Browser] = None
+        self.context = None
         
     async def __aenter__(self):
         """Асинхронный контекстный менеджер для инициализации браузера"""
         self.playwright = await async_playwright().start()
         self.browser = await self.playwright.chromium.launch(
             headless=self.headless,
-            args=[
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--disable-gpu',
-                '--disable-web-security',
-                '--disable-features=VizDisplayCompositor'
-            ]
+            args=config.get_browser_args()
         )
+        
+        # Создаем контекст для переиспользования, если включено
+        if self.reuse_context:
+            self.context = await self.browser.new_context()
+            logger.info("Browser context created for reuse")
+        
         return self
         
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Закрытие браузера при выходе из контекста"""
+        if self.context:
+            await self.context.close()
         if self.browser:
             await self.browser.close()
         if hasattr(self, 'playwright'):
@@ -69,18 +70,19 @@ class LocalRenderer:
         start_time = time.time()
         
         try:
-            # Создаем новую страницу
-            page = await self.browser.new_page()
+            # Создаем новую страницу (используем переиспользуемый контекст или создаем новый)
+            if self.reuse_context and self.context:
+                page = await self.context.new_page()
+                # Очищаем cookies и кэш между запросами для изоляции
+                await self.context.clear_cookies()
+                await self.context.clear_cache()
+            else:
+                # Создаем новый контекст для каждого запроса (более безопасно)
+                context = await self.browser.new_context()
+                page = await context.new_page()
             
             # Настраиваем User-Agent и другие заголовки
-            await page.set_extra_http_headers({
-                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
-                'Accept-Encoding': 'gzip, deflate',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1',
-            })
+            await page.set_extra_http_headers(config.get_http_headers())
             
             # Отключаем загрузку изображений и шрифтов для ускорения
             await page.route("**/*", self._route_handler)
@@ -103,8 +105,10 @@ class LocalRenderer:
             
             render_time = time.time() - start_time
             
-            # Закрываем страницу
+            # Закрываем страницу и контекст (если создавали новый)
             await page.close()
+            if not self.reuse_context or not self.context:
+                await context.close()
             
             result = {
                 'html_content': html_content,
@@ -143,7 +147,7 @@ class LocalRenderer:
             await route.continue_()
 
 
-async def fetch_js_local(url: str, headless: bool = True, timeout: int = 30000) -> Dict[str, Any]:
+async def fetch_js_local(url: str, headless: bool = True, timeout: int = 30000, reuse_context: bool = False) -> Dict[str, Any]:
     """
     Удобная функция для рендеринга URL через локальный браузер
     
@@ -151,11 +155,12 @@ async def fetch_js_local(url: str, headless: bool = True, timeout: int = 30000) 
         url: URL для рендеринга
         headless: Запускать браузер в headless режиме
         timeout: Таймаут в миллисекундах
+        reuse_context: Переиспользовать контекст браузера для повышения производительности
         
     Returns:
         Словарь с результатами рендеринга
     """
-    async with LocalRenderer(headless=headless, timeout=timeout) as renderer:
+    async with LocalRenderer(headless=headless, timeout=timeout, reuse_context=reuse_context) as renderer:
         return await renderer.fetch_js_local(url)
 
 
