@@ -4,7 +4,7 @@ import re
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class DataValidator:
@@ -151,13 +151,15 @@ class ScrapedDataModel(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
     timestamp: Optional[str] = Field(None, description="Extraction timestamp")
     
-    @validator('url')
+    @field_validator('url')
+    @classmethod
     def validate_url(cls, v):
         if not DataValidator.validate_url(v):
             raise ValueError('Invalid URL format')
         return v
     
-    @validator('content')
+    @field_validator('content')
+    @classmethod
     def clean_content(cls, v):
         if v:
             return DataValidator.clean_text(v)

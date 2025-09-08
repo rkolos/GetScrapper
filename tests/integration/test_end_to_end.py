@@ -3,7 +3,7 @@
 import json
 import os
 import pytest
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, AsyncMock
 
 from getscrapper.core.scraper import Scraper
 from getscrapper.config.settings import Settings
@@ -12,19 +12,21 @@ from getscrapper.config.settings import Settings
 class TestEndToEndScraping:
     """Test complete scraping workflows."""
 
-    @patch('getscrapper.core.scraper.SessionManager')
-    def test_html_scraping_workflow(self, mock_session_manager, sample_html, temp_dir):
-        """Test complete HTML scraping workflow."""
-        # Mock session manager and response
-        mock_session = Mock()
-        mock_response = Mock()
-        mock_response.text = sample_html
-        mock_response.headers = {'content-type': 'text/html'}
-        mock_response.status_code = 200
-        mock_session.get.return_value = mock_response
-        mock_session_manager.return_value = mock_session
-        
-        # Initialize scraper
+    def test_html_scraping_workflow(self, sample_html, temp_dir):
+        """Test end-to-end scraping workflow."""
+        # Mock detection controller to avoid real network calls
+        with patch('getscrapper.core.detection_controller.DetectionController') as mock_detection_controller:
+            mock_instance = Mock()
+            mock_fetch_result = {
+                'html_content': sample_html,
+                'content_type': 'text/html',
+                'status_code': 200,
+                'escalation_level': 'static'
+            }
+            mock_instance.fetch_html_with_escalation = AsyncMock(return_value=mock_fetch_result)
+            mock_detection_controller.return_value = mock_instance
+            
+            # Initialize scraper
         config = {"output_dir": temp_dir}
         scraper = Scraper(config)
         
@@ -40,7 +42,8 @@ class TestEndToEndScraping:
         )
         
         # Verify results
-        assert len(results) >= 1
+            
+            assert len(results) >= 1
         
         # Check that file was saved
         files = os.listdir(temp_dir)
@@ -55,40 +58,43 @@ class TestEndToEndScraping:
         assert len(saved_data) >= 1
         assert saved_data[0]["url"] == "https://example.com"
 
-    @patch('getscrapper.core.scraper.SessionManager')
-    def test_json_scraping_workflow(self, mock_session_manager, sample_json, temp_dir):
+    @pytest.mark.asyncio
+    async def test_json_scraping_workflow(self, sample_json, temp_dir):
         """Test complete JSON scraping workflow."""
-        # Mock session manager and response
-        mock_session = Mock()
-        mock_response = Mock()
-        mock_response.text = sample_json
-        mock_response.headers = {'content-type': 'application/json'}
-        mock_response.status_code = 200
-        mock_session.get.return_value = mock_response
-        mock_session_manager.return_value = mock_session
+        # Mock detection controller to avoid real network calls
+        with patch('getscrapper.core.detection_controller.DetectionController') as mock_detection_controller:
+            mock_instance = Mock()
+            mock_fetch_result = {
+                'html_content': sample_json,
+                'content_type': 'application/json',
+                'status_code': 200,
+                'escalation_level': 'static'
+            }
+            mock_instance.fetch_html_with_escalation = AsyncMock(return_value=mock_fetch_result)
+            mock_detection_controller.return_value = mock_instance
         
-        # Initialize scraper
-        config = {"output_dir": temp_dir}
-        scraper = Scraper(config)
+            # Initialize scraper
+            config = {"output_dir": temp_dir}
+            scraper = Scraper(config)
+            
+            # Scrape JSON data
+            results = await scraper.scrape_url(
+                "https://api.example.com/data",
+                parser_type="json",
+                path="users",
+                extract_arrays=True,
+                process_data=True,
+                save_data=True,
+                output_format="csv"
+            )
         
-        # Scrape JSON data
-        results = scraper.scrape_url(
-            "https://api.example.com/data",
-            parser_type="json",
-            path="users",
-            extract_arrays=True,
-            process_data=True,
-            save_data=True,
-            output_format="csv"
-        )
-        
-        # Verify results
-        assert len(results) >= 1
-        
-        # Check that file was saved
-        files = os.listdir(temp_dir)
-        assert len(files) == 1
-        assert files[0].endswith('.csv')
+            # Verify results
+            assert len(results) >= 1
+            
+            # Check that file was saved
+            files = os.listdir(temp_dir)
+            assert len(files) == 1
+            assert files[0].endswith('.csv')
 
     @patch('getscrapper.core.scraper.SessionManager')
     def test_multiple_urls_workflow(self, mock_session_manager, sample_html, temp_dir):
@@ -181,7 +187,7 @@ class TestEndToEndScraping:
         
         # Verify settings were applied
         assert scraper.output_dir == temp_dir
-        assert scraper.session_manager.timeout == 60
+        assert scraper.detection_controller.timeout == 60
 
     @patch('getscrapper.core.scraper.SessionManager')
     def test_data_processing_integration(self, mock_session_manager, sample_html, temp_dir):
@@ -263,7 +269,7 @@ class TestEndToEndScraping:
         config = {"output_dir": temp_dir}
         
         with Scraper(config) as scraper:
-            assert scraper.session_manager is not None
+            assert scraper.detection_controller is not None
             assert scraper.output_dir == temp_dir
         
         # Scraper should be properly closed

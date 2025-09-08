@@ -4,7 +4,7 @@ import json
 import os
 import pytest
 from click.testing import CliRunner
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, AsyncMock
 
 from getscrapper.cli.main import cli
 
@@ -58,98 +58,104 @@ class TestCLIIntegration:
         config_data = json.loads(result.output)
         assert "session" in config_data
 
-    @patch('getscrapper.core.scraper.SessionManager')
-    def test_cli_scrape_command(self, mock_session_manager, sample_html, temp_dir):
+    def test_cli_scrape_command(self, sample_html, temp_dir):
         """Test CLI scrape command."""
-        # Mock session manager and response
-        mock_session = Mock()
-        mock_response = Mock()
-        mock_response.text = sample_html
-        mock_response.headers = {'content-type': 'text/html'}
-        mock_response.status_code = 200
-        mock_session.get.return_value = mock_response
-        mock_session_manager.return_value = mock_session
-        
-        runner = CliRunner()
-        result = runner.invoke(cli, [
-            '--output-dir', temp_dir,
-            'scrape', 'https://example.com'
-        ])
-        
-        assert result.exit_code == 0
-        assert "Successfully scraped" in result.output
+        # Mock detection controller to avoid real network calls
+        with patch('getscrapper.core.detection_controller.DetectionController') as mock_detection_controller:
+            mock_instance = Mock()
+            mock_fetch_result = {
+                'html_content': sample_html,
+                'content_type': 'text/html',
+                'status_code': 200,
+                'escalation_level': 'static'
+            }
+            mock_instance.fetch_html_with_escalation = AsyncMock(return_value=mock_fetch_result)
+            mock_detection_controller.return_value = mock_instance
+            
+            runner = CliRunner()
+            result = runner.invoke(cli, [
+                '--output-dir', temp_dir,
+                'scrape', 'https://example.com'
+            ])
+            
+            assert result.exit_code == 0
+            assert "Successfully scraped" in result.output
 
-    @patch('getscrapper.core.scraper.SessionManager')
-    def test_cli_scrape_with_options(self, mock_session_manager, sample_html, temp_dir):
+    def test_cli_scrape_with_options(self, sample_html, temp_dir):
         """Test CLI scrape command with options."""
-        # Mock session manager and response
-        mock_session = Mock()
-        mock_response = Mock()
-        mock_response.text = sample_html
-        mock_response.headers = {'content-type': 'text/html'}
-        mock_response.status_code = 200
-        mock_session.get.return_value = mock_response
-        mock_session_manager.return_value = mock_session
-        
-        runner = CliRunner()
-        result = runner.invoke(cli, [
-            '--output-dir', temp_dir,
-            'scrape', 'https://example.com',
-            '--parser', 'html',
-            '--extract-links',
-            '--extract-images',
-            '--save',
-            '--output-format', 'json'
-        ])
-        
-        assert result.exit_code == 0
-        assert "Successfully scraped" in result.output
+        # Mock detection controller to avoid real network calls
+        with patch('getscrapper.core.detection_controller.DetectionController') as mock_detection_controller:
+            mock_instance = Mock()
+            mock_fetch_result = {
+                'html_content': sample_html,
+                'content_type': 'text/html',
+                'status_code': 200,
+                'escalation_level': 'static'
+            }
+            mock_instance.fetch_html_with_escalation = AsyncMock(return_value=mock_fetch_result)
+            mock_detection_controller.return_value = mock_instance
+            
+            runner = CliRunner()
+            result = runner.invoke(cli, [
+                '--output-dir', temp_dir,
+                'scrape', 'https://example.com',
+                '--parser', 'html',
+                '--extract-links',
+                '--extract-images',
+                '--save',
+                '--output-format', 'json'
+            ])
+            
+            assert result.exit_code == 0
+            assert "Successfully scraped" in result.output
 
-    @patch('getscrapper.core.scraper.SessionManager')
-    def test_cli_scrape_with_selectors(self, mock_session_manager, sample_html, temp_dir):
-        """Test CLI scrape command with selectors."""
-        # Mock session manager and response
-        mock_session = Mock()
-        mock_response = Mock()
-        mock_response.text = sample_html
-        mock_response.headers = {'content-type': 'text/html'}
-        mock_response.status_code = 200
-        mock_session.get.return_value = mock_response
-        mock_session_manager.return_value = mock_session
-        
-        selectors = '{"title": "h1", "content": ".content p"}'
-        
-        runner = CliRunner()
-        result = runner.invoke(cli, [
+    def test_cli_scrape_with_selectors(self, sample_html, temp_dir):
+        """Test CLI scrape command."""
+        # Mock detection controller to avoid real network calls
+        with patch('getscrapper.core.detection_controller.DetectionController') as mock_detection_controller:
+            mock_instance = Mock()
+            mock_fetch_result = {
+                'html_content': sample_html,
+                'content_type': 'text/html',
+                'status_code': 200,
+                'escalation_level': 'static'
+            }
+            mock_instance.fetch_html_with_escalation = AsyncMock(return_value=mock_fetch_result)
+            mock_detection_controller.return_value = mock_instance
+            
+            runner = CliRunner()
+            result = runner.invoke(cli, [
             '--output-dir', temp_dir,
             'scrape', 'https://example.com',
             '--selectors', selectors
         ])
-        
-        assert result.exit_code == 0
+            
+            assert result.exit_code == 0
         assert "Successfully scraped" in result.output
 
-    @patch('getscrapper.core.scraper.SessionManager')
-    def test_cli_scrape_multiple_command(self, mock_session_manager, sample_html, temp_dir):
-        """Test CLI scrape-multiple command."""
-        # Mock session manager and response
-        mock_session = Mock()
-        mock_response = Mock()
-        mock_response.text = sample_html
-        mock_response.headers = {'content-type': 'text/html'}
-        mock_response.status_code = 200
-        mock_session.get.return_value = mock_response
-        mock_session_manager.return_value = mock_session
-        
-        runner = CliRunner()
-        result = runner.invoke(cli, [
+    def test_cli_scrape_multiple_command(self, sample_html, temp_dir):
+        """Test CLI scrape command."""
+        # Mock detection controller to avoid real network calls
+        with patch('getscrapper.core.detection_controller.DetectionController') as mock_detection_controller:
+            mock_instance = Mock()
+            mock_fetch_result = {
+                'html_content': sample_html,
+                'content_type': 'text/html',
+                'status_code': 200,
+                'escalation_level': 'static'
+            }
+            mock_instance.fetch_html_with_escalation = AsyncMock(return_value=mock_fetch_result)
+            mock_detection_controller.return_value = mock_instance
+            
+            runner = CliRunner()
+            result = runner.invoke(cli, [
             '--output-dir', temp_dir,
             'scrape-multiple',
             'https://example.com',
             'https://example.com/page2'
         ])
-        
-        assert result.exit_code == 0
+            
+            assert result.exit_code == 0
         assert "Successfully scraped" in result.output
 
     def test_cli_scrape_multiple_from_file(self, temp_dir):
@@ -162,15 +168,17 @@ class TestCLIIntegration:
         
         runner = CliRunner()
         
-        with patch('getscrapper.core.scraper.SessionManager') as mock_session_manager:
-            # Mock session manager and response
-            mock_session = Mock()
-            mock_response = Mock()
-            mock_response.text = '<html><body>Test</body></html>'
-            mock_response.headers = {'content-type': 'text/html'}
-            mock_response.status_code = 200
-            mock_session.get.return_value = mock_response
-            mock_session_manager.return_value = mock_session
+        with patch('getscrapper.core.detection_controller.DetectionController') as mock_detection_controller:
+            # Mock detection controller
+            mock_instance = Mock()
+            mock_fetch_result = {
+                'html_content': '<html><body>Test</body></html>',
+                'content_type': 'text/html',
+                'status_code': 200,
+                'escalation_level': 'static'
+            }
+            mock_instance.fetch_html_with_escalation = AsyncMock(return_value=mock_fetch_result)
+            mock_detection_controller.return_value = mock_instance
             
             result = runner.invoke(cli, [
                 '--output-dir', temp_dir,
@@ -245,49 +253,53 @@ class TestCLIIntegration:
         
         assert result.exit_code == 2  # Click returns 2 for argument errors
 
-    @patch('getscrapper.core.scraper.SessionManager')
-    def test_cli_scrape_with_save_and_no_output(self, mock_session_manager, sample_html, temp_dir):
-        """Test CLI scrape with save but no output to stdout."""
-        # Mock session manager and response
-        mock_session = Mock()
-        mock_response = Mock()
-        mock_response.text = sample_html
-        mock_response.headers = {'content-type': 'text/html'}
-        mock_response.status_code = 200
-        mock_session.get.return_value = mock_response
-        mock_session_manager.return_value = mock_session
-        
-        runner = CliRunner()
-        result = runner.invoke(cli, [
+    def test_cli_scrape_with_save_and_no_output(self, sample_html, temp_dir):
+        """Test CLI scrape command."""
+        # Mock detection controller to avoid real network calls
+        with patch('getscrapper.core.detection_controller.DetectionController') as mock_detection_controller:
+            mock_instance = Mock()
+            mock_fetch_result = {
+                'html_content': sample_html,
+                'content_type': 'text/html',
+                'status_code': 200,
+                'escalation_level': 'static'
+            }
+            mock_instance.fetch_html_with_escalation = AsyncMock(return_value=mock_fetch_result)
+            mock_detection_controller.return_value = mock_instance
+            
+            runner = CliRunner()
+            result = runner.invoke(cli, [
             '--output-dir', temp_dir,
             'scrape', 'https://example.com',
             '--save'
         ])
-        
-        assert result.exit_code == 0
+            
+            assert result.exit_code == 0
         assert "Successfully scraped" in result.output
         # Should not output JSON data when saving to file
         assert "{" not in result.output
 
-    @patch('getscrapper.core.scraper.SessionManager')
-    def test_cli_scrape_without_save(self, mock_session_manager, sample_html, temp_dir):
-        """Test CLI scrape without save (output to stdout)."""
-        # Mock session manager and response
-        mock_session = Mock()
-        mock_response = Mock()
-        mock_response.text = sample_html
-        mock_response.headers = {'content-type': 'text/html'}
-        mock_response.status_code = 200
-        mock_session.get.return_value = mock_response
-        mock_session_manager.return_value = mock_session
-        
-        runner = CliRunner()
-        result = runner.invoke(cli, [
+    def test_cli_scrape_without_save(self, sample_html, temp_dir):
+        """Test CLI scrape command."""
+        # Mock detection controller to avoid real network calls
+        with patch('getscrapper.core.detection_controller.DetectionController') as mock_detection_controller:
+            mock_instance = Mock()
+            mock_fetch_result = {
+                'html_content': sample_html,
+                'content_type': 'text/html',
+                'status_code': 200,
+                'escalation_level': 'static'
+            }
+            mock_instance.fetch_html_with_escalation = AsyncMock(return_value=mock_fetch_result)
+            mock_detection_controller.return_value = mock_instance
+            
+            runner = CliRunner()
+            result = runner.invoke(cli, [
             '--output-dir', temp_dir,
             'scrape', 'https://example.com'
         ])
-        
-        assert result.exit_code == 0
+            
+            assert result.exit_code == 0
         assert "Successfully scraped" in result.output
         # Should output JSON data to stdout
         assert "{" in result.output
