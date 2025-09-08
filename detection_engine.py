@@ -159,12 +159,16 @@ class DetectionEngine:
             analysis['blocking_reasons'].extend(url_result['reasons'])
             analysis['confidence_score'] += 0.4
         
-        # Правило 3: Структурный анализ HTML (высокий приоритет)
+        # Правило 3: Структурный анализ HTML (критический приоритет)
         html_result = self._check_html_blocking(render_result.get('html_content', ''))
         analysis['rule_results']['html_check'] = html_result
         if html_result['blocked']:
             analysis['blocking_reasons'].extend(html_result['reasons'])
-            analysis['confidence_score'] += 0.3
+            # HTML-анализ имеет максимальный приоритет - если найден критический селектор
+            if any('Critical' in reason for reason in html_result['reasons']):
+                analysis['confidence_score'] = 1.0  # 100% уверенность
+            else:
+                analysis['confidence_score'] += 0.5  # Высокий приоритет
         
         # Правило 4: Анализ контента (средний приоритет)
         content_result = self._check_content_blocking(render_result.get('html_content', ''))
@@ -231,6 +235,31 @@ class DetectionEngine:
         try:
             soup = BeautifulSoup(html_content, 'html.parser')
             
+            # Критически важные селекторы - 100% блокировка
+            critical_selectors = [
+                # Cloudflare challenge
+                soup.find("div", id=re.compile(r"cf-challenge", re.IGNORECASE)),
+                soup.find("form", id="challenge-form"),
+                # reCAPTCHA и hCaptcha
+                soup.find("iframe", src=re.compile(r"hcaptcha\.com|recaptcha\.net|recaptcha\.com")),
+                # Дополнительные критические селекторы
+                soup.find("div", class_=re.compile(r"cf-challenge", re.IGNORECASE)),
+                soup.find("div", id=re.compile(r"challenge", re.IGNORECASE)),
+                soup.find("div", class_=re.compile(r"challenge", re.IGNORECASE)),
+                soup.find("div", id=re.compile(r"captcha", re.IGNORECASE)),
+                soup.find("div", class_=re.compile(r"captcha", re.IGNORECASE)),
+            ]
+            
+            # Проверяем критические селекторы
+            for element in critical_selectors:
+                if element:
+                    result['blocked'] = True
+                    result['found_selectors'].append(f"Critical: {element.name}#{element.get('id', '')}.{element.get('class', [])}")
+                    result['reasons'].append(f"Critical blocking element found: {element.name}")
+                    # Если найден критический селектор, сразу возвращаем True
+                    return result
+            
+            # Проверяем остальные селекторы
             for selector in self.html_blocking_selectors:
                 elements = soup.select(selector)
                 if elements:
@@ -316,6 +345,26 @@ if __name__ == "__main__":
                 'final_url': 'https://example.com/cdn-cgi/challenge',
                 'status_code': 200,
                 'content_length': 200
+            }
+        },
+        {
+            'name': 'reCAPTCHA challenge',
+            'data': {
+                'html_content': '<html><head><title>Verify you are human</title></head><body><iframe src="https://www.google.com/recaptcha/api2/anchor"></iframe></body></html>',
+                'page_title': 'Verify you are human',
+                'final_url': 'https://example.com',
+                'status_code': 200,
+                'content_length': 300
+            }
+        },
+        {
+            'name': 'hCaptcha challenge',
+            'data': {
+                'html_content': '<html><head><title>Security Check</title></head><body><iframe src="https://hcaptcha.com/1/api.js"></iframe></body></html>',
+                'page_title': 'Security Check',
+                'final_url': 'https://example.com',
+                'status_code': 200,
+                'content_length': 250
             }
         },
         {

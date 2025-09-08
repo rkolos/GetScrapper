@@ -6,10 +6,10 @@
 import asyncio
 import logging
 from typing import Dict, Any, Optional
-import os
 from universal_renderer import fetch_js_local
 from detection_engine import DetectionEngine
 from browserbase_client import fetch_via_browserbase
+from config import config
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -22,8 +22,9 @@ class UniversalRenderer:
     def __init__(self, 
                  browserbase_api_key: Optional[str] = None,
                  browserbase_project_id: Optional[str] = None,
-                 local_timeout: int = 30000,
-                 local_headless: bool = True):
+                 local_timeout: Optional[int] = None,
+                 local_headless: Optional[bool] = None,
+                 reuse_context: Optional[bool] = None):
         """
         Инициализация рендерера
         
@@ -32,14 +33,18 @@ class UniversalRenderer:
             browserbase_project_id: ID проекта Browserbase (из переменной окружения если не указан)
             local_timeout: Таймаут для локального браузера в миллисекундах
             local_headless: Запускать локальный браузер в headless режиме
+            reuse_context: Переиспользовать контекст браузера
         """
         self.detection_engine = DetectionEngine()
-        self.local_timeout = local_timeout
-        self.local_headless = local_headless
+        
+        # Используем конфигурацию из переменных окружения с возможностью переопределения
+        self.local_timeout = local_timeout or config.PLAYWRIGHT_TIMEOUT
+        self.local_headless = local_headless if local_headless is not None else config.PLAYWRIGHT_HEADLESS
+        self.reuse_context = reuse_context if reuse_context is not None else config.PLAYWRIGHT_REUSE_CONTEXT
         
         # Настройка Browserbase
-        self.browserbase_api_key = browserbase_api_key or os.getenv('BROWSERBASE_API_KEY')
-        self.browserbase_project_id = browserbase_project_id or os.getenv('BROWSERBASE_PROJECT_ID')
+        self.browserbase_api_key = browserbase_api_key or config.BROWSERBASE_API_KEY
+        self.browserbase_project_id = browserbase_project_id or config.BROWSERBASE_PROJECT_ID
         
         if not self.browserbase_api_key or not self.browserbase_project_id:
             logger.warning("Browserbase credentials not provided. Fallback will not be available.")
@@ -76,21 +81,23 @@ class UniversalRenderer:
         
         # Шаг 1: Локальный рендеринг (Уровень 2)
         logger.info(f"[INFO] Attempting local render for: {url}")
-        result_l2 = await fetch_js_local(url, headless=self.local_headless, timeout=self.local_timeout)
+        result_l2 = await fetch_js_local(
+            url, 
+            headless=self.local_headless, 
+            timeout=self.local_timeout,
+            reuse_context=self.reuse_context
+        )
         
         # Шаг 2: Проверка на явный сбой рендеринга
         if result_l2.get('error'):
             logger.error(f"[ERROR] Local render failed for {url}: {result_l2['error']}")
-            if not self.browserbase_available:
-                return {
-                    **result_l2,
-                    'source': 'local',
-                    'escalation_reason': 'local_render_failed_no_fallback',
-                    'detection_analysis': None
-                }
-            else:
-                logger.info(f"[WARN] Escalating to Browserbase due to local render failure")
-                return await self._escalate_to_browserbase(url, "local_render_failed")
+            # Технический сбой - не эскалируем до Browserbase, сразу возвращаем ошибку
+            return {
+                **result_l2,
+                'source': 'local',
+                'escalation_reason': 'technical_failure',
+                'detection_analysis': None
+            }
         
         # Шаг 3: Анализ через DetectionEngine
         logger.info(f"[INFO] Analyzing local render result for blocking detection")
@@ -111,6 +118,7 @@ class UniversalRenderer:
                     'detection_analysis': detection_analysis
                 }
             
+            # Эскалация только при успешной работе L2, которая вернула страницу-блокировщик
             return await self._escalate_to_browserbase(url, "blocking_detected", detection_analysis)
         else:
             logger.info(f"[INFO] URL: {url} | Local render successful.")
