@@ -1,5 +1,6 @@
 # GetScrapper
 
+cursor/bc-0f7980de-b2a4-44b9-a939-a6dedab11f6d-6d1d
 [![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](tests/)
@@ -408,4 +409,333 @@ For support, please open an issue on GitHub or contact the maintainers.
 - [ ] Web interface for configuration
 - [ ] Plugin system for custom parsers
 - [ ] Advanced data transformation pipelines
-- [ ] Real-time monitoring and metrics
+- [ ] Real-time monitoring and
+Высокопроизводительный микросервис для извлечения и конвертации веб-страниц в формат Markdown с двухэтапной стратегией скрапинга.
+
+## 📋 Описание проекта
+
+GetScrapper — это микросервис на Node.js, который принимает URL веб-страницы и возвращает ее основное содержимое в формате Markdown. Сервис использует интеллектуальную двухэтапную стратегию получения контента для максимальной надежности и обхода анти-бот систем.
+
+### 🎯 Ключевые особенности
+
+- **Двухэтапное получение контента**: Первичная попытка через локальный headless браузер, автоматический fallback на Browserbase.io при обнаружении блокировок
+- **Оптимизация памяти**: Явные механизмы очистки ресурсов и управление параллельной нагрузкой
+- **Высокая производительность**: Ограничение параллельных запросов для стабильности
+- **Чистый Markdown**: Автоматическая очистка от навигационных, рекламных и служебных элементов
+
+## 🏗️ Архитектура
+
+Сервис состоит из двух основных контейнеров:
+
+```
+┌─────────────────────┐    ┌─────────────────────┐
+│   get-scrapper-app  │    │   browser-emulator  │
+│   (Node.js/Express) │◄──►│   (browserless/     │
+│                     │    │    chrome)          │
+└─────────────────────┘    └─────────────────────┘
+           │
+           ▼
+┌─────────────────────┐
+│   Browserbase.io    │
+│   (Fallback API)    │
+└─────────────────────┘
+```
+
+### Схема взаимодействия
+
+```mermaid
+sequenceDiagram
+    participant Client as Клиент
+    participant GetScrapper as GetScrapper Service
+    participant Browser as Локальный браузер
+    participant Browserbase as Browserbase.io API
+
+    Client->>+GetScrapper: GET /scrape?url=...
+    GetScrapper->>+Browser: 1. Попытка получить HTML
+    alt Успешно
+        Browser-->>-GetScrapper: Возвращает HTML
+    else Ошибка навигации ИЛИ Обнаружена блокировка
+        Browser-->>-GetScrapper: Ошибка / HTML с заглушкой
+        GetScrapper->>+Browserbase: 2. Запрос к внешнему сервису
+        Browserbase-->>-GetScrapper: Возвращает HTML
+    end
+    GetScrapper->>GetScrapper: Очистка HTML от мусора
+    GetScrapper->>GetScrapper: Конвертация HTML в Markdown
+    GetScrapper-->>-Client: 200 OK (Markdown текст)
+```
+
+## 🛠️ Технологический стек
+
+- **Веб-фреймворк**: Express.js
+- **Управление браузером**: Puppeteer-core
+- **HTTP-клиент**: axios
+- **HTML в Markdown**: turndown
+- **Очистка HTML**: cheerio
+- **Конфигурация**: dotenv
+- **Логирование**: pino
+- **Ограничение нагрузки**: p-limit
+- **Контейнеризация**: Docker, Docker Compose
+
+## 🚀 Быстрый старт
+
+### Предварительные требования
+
+- Docker и Docker Compose
+- Node.js 18+ (для локальной разработки)
+
+### Установка и запуск
+
+1. **Клонирование репозитория**
+   ```bash
+   git clone <repository-url>
+   cd get-scrapper
+   ```
+
+2. **Настройка переменных окружения**
+   ```bash
+   cp .env.example .env
+   # Отредактируйте .env файл с вашими настройками
+   ```
+
+3. **Запуск через Docker Compose**
+   ```bash
+   docker-compose up -d
+   ```
+
+4. **Проверка работы**
+   ```bash
+   curl "http://localhost:3000/scrape?url=https://example.com"
+   ```
+
+### Локальная разработка
+
+```bash
+# Установка зависимостей
+npm install
+
+# Запуск локального браузера
+docker run -d -p 9222:3000 browserless/chrome
+
+# Запуск приложения
+npm start
+```
+
+## 📡 API Документация
+
+### Эндпоинт: `GET /scrape`
+
+Получает HTML-код страницы по указанному URL, очищает его и конвертирует в Markdown.
+
+#### Параметры запроса
+
+| Параметр | Тип | Обязательный | Описание |
+|----------|-----|--------------|----------|
+| `url` | string | Да | URL-адрес страницы для скрапинга (должен быть URL-encoded) |
+
+#### Примеры запросов
+
+```bash
+# Простой запрос
+curl "http://localhost:3000/scrape?url=https://example.com"
+
+# URL с параметрами (требует URL-encoding)
+curl "http://localhost:3000/scrape?url=https%3A//example.com%3Fparam%3Dvalue"
+```
+
+#### Ответы
+
+**Успешный ответ (200 OK)**
+```
+Content-Type: text/markdown; charset=utf-8
+
+# Заголовок страницы
+
+Основное содержимое страницы в формате Markdown...
+```
+
+**Ошибки**
+
+| Код | Описание |
+|-----|----------|
+| `400 Bad Request` | Параметр `url` отсутствует или имеет невалидный формат |
+| `500 Internal Server Error` | Обе попытки скрапинга (локальная и через Browserbase) провалились |
+| `504 Gateway Timeout` | Один из этапов скрапинга занял слишком много времени |
+
+## ⚙️ Конфигурация
+
+### Переменные окружения
+
+Создайте файл `.env` в корне проекта:
+
+```env
+# Порт приложения
+PORT=3000
+
+# Настройки локального браузера
+BROWSER_WS_ENDPOINT=ws://browser:3000
+
+# Настройки Browserbase.io
+BROWSERBASE_PROJECT_ID=your_project_id
+BROWSERBASE_API_TOKEN=your_api_token
+
+# Ограничения производительности
+MAX_CONCURRENT_REQUESTS=5
+REQUEST_TIMEOUT=30000
+
+# Логирование
+LOG_LEVEL=info
+```
+
+### Настройка Browserbase.io
+
+1. Зарегистрируйтесь на [Browserbase.io](https://browserbase.io)
+2. Создайте новый проект
+3. Получите Project ID и API Token
+4. Добавьте их в `.env` файл
+
+## 🔧 Управление памятью и производительностью
+
+### Стратегия управления ресурсами
+
+- **Жизненный цикл страниц**: Каждый запрос создает новую страницу в браузере, которая гарантированно закрывается в блоке `finally`
+- **Ограничение параллелизма**: Использование `p-limit` для контроля количества одновременных запросов
+- **Ручная сборка мусора**: Присвоение `null` большим переменным после обработки
+- **Долгоживущие соединения**: Одно соединение с браузером на весь жизненный цикл приложения
+
+### Мониторинг
+
+Сервис использует структурированное логирование через `pino`:
+
+```json
+{
+  "level": 30,
+  "time": 1640995200000,
+  "msg": "Scraping completed",
+  "url": "https://example.com",
+  "method": "puppeteer",
+  "duration": 1250
+}
+```
+
+## 🐳 Docker
+
+### Структура контейнеров
+
+```yaml
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - BROWSER_WS_ENDPOINT=ws://browser:3000
+    depends_on:
+      - browser
+
+  browser:
+    image: browserless/chrome
+    ports:
+      - "3000:3000"
+```
+
+### Сборка образа
+
+```bash
+# Сборка образа приложения
+docker build -t get-scrapper .
+
+# Запуск всего стека
+docker-compose up -d
+```
+
+## 🧪 Тестирование
+
+```bash
+# Запуск тестов
+npm test
+
+# Тестирование с покрытием
+npm run test:coverage
+
+# Интеграционные тесты
+npm run test:integration
+```
+
+## 📊 Мониторинг и логи
+
+### Метрики производительности
+
+- Время ответа на запрос
+- Количество успешных/неуспешных запросов
+- Использование памяти
+- Количество активных соединений
+
+### Логирование
+
+Все операции логируются с различными уровнями детализации:
+
+- `ERROR`: Критические ошибки
+- `WARN`: Предупреждения (например, fallback на Browserbase)
+- `INFO`: Информационные сообщения
+- `DEBUG`: Детальная отладочная информация
+
+## 🔒 Безопасность
+
+- Валидация всех входящих URL
+- Ограничение размера ответов
+- Таймауты для всех внешних запросов
+- Изоляция в Docker контейнерах
+
+## 🤝 Разработка
+
+### Структура проекта
+
+```
+get-scrapper/
+├── src/
+│   ├── controllers/     # Обработчики API
+│   ├── services/        # Бизнес-логика
+│   ├── utils/          # Вспомогательные функции
+│   └── config/         # Конфигурация
+├── tests/              # Тесты
+├── docker/             # Docker файлы
+├── .env.example        # Пример конфигурации
+├── docker-compose.yml  # Оркестрация контейнеров
+└── README.md          # Документация
+```
+
+### Внесение изменений
+
+1. Создайте feature branch
+2. Внесите изменения
+3. Добавьте тесты
+4. Убедитесь, что все тесты проходят
+5. Создайте Pull Request
+
+## 📝 Лицензия
+
+Этот проект распространяется под лицензией MIT. См. файл [LICENSE](LICENSE) для подробностей.
+
+## 🆘 Поддержка
+
+При возникновении проблем:
+
+1. Проверьте логи: `docker-compose logs app`
+2. Убедитесь в корректности конфигурации `.env`
+3. Проверьте доступность внешних сервисов
+4. Создайте issue в репозитории
+
+## 🔄 Changelog
+
+### Версия 2.0 (08.09.2025)
+- ✅ Двухэтапная стратегия скрапинга
+- ✅ Интеграция с Browserbase.io
+- ✅ Оптимизация управления памятью
+- ✅ Docker контейнеризация
+- ✅ Структурированное логирование
+
+---
+
+**Статус**: В разработке  
+**Версия**: 2.0  
+**Дата**: 08.09.20
