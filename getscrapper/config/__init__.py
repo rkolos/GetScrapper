@@ -1,5 +1,8 @@
 """Configuration management."""
 
-from .settings import Settings
+try:
+    from .settings import Settings
+except ImportError:
+    from .simple_settings import SimpleSettings as Settings
 
 __all__ = ["Settings"]

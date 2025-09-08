@@ -1,14 +1,18 @@
 """Main scraper class for GetScrapper."""
 
 import os
+import asyncio
 from typing import Any, Dict, List, Optional, Union, Set
 from urllib.parse import urljoin, urlparse
 
-from .session import SessionManager
+from .detection_controller import DetectionController, EscalationLevel
 from ..parsers.html_parser import HTMLParser
 from ..parsers.json_parser import JSONParser
 from ..processors.data_processor import DataProcessor
-from ..storage.csv_storage import CSVStorage
+try:
+    from ..storage.csv_storage import CSVStorage
+except ImportError:
+    from ..storage.simple_csv_storage import SimpleCSVStorage as CSVStorage
 from ..storage.json_storage import JSONStorage
 from ..utils.exceptions import GetScrapperError, ParsingError
 from ..utils.logger import setup_logger
@@ -23,17 +27,21 @@ class Scraper:
         
         Args:
             config: Scraper configuration with keys:
-                - session: Session configuration
+                - detection_controller: Detection controller configuration
                 - parser: Parser configuration
                 - processor: Data processor configuration
                 - storage: Storage configuration
                 - output_dir: Output directory for saved files
+                - default_escalation_level: Default escalation level to start with
         """
         self.config = config or {}
         self.logger = setup_logger("getscrapper.scraper")
         
-        # Initialize components
-        self.session_manager = SessionManager(self.config.get("session", {}))
+        # Initialize detection controller with fetcher strategies
+        detection_config = self.config.get("detection_controller", {})
+        self.detection_controller = DetectionController(detection_config)
+        
+        # Initialize parsers
         self.html_parser = HTMLParser(self.config.get("parser", {}))
         self.json_parser = JSONParser(self.config.get("parser", {}))
         self.data_processor = DataProcessor(self.config.get("processor", {}))
@@ -46,16 +54,21 @@ class Scraper:
         self.output_dir = self.config.get("output_dir", "./output")
         os.makedirs(self.output_dir, exist_ok=True)
         
+        # Default escalation level
+        self.default_escalation_level = self.config.get("default_escalation_level", EscalationLevel.STATIC)
+        
         # Recursive scraping state
         self.visited_urls: Set[str] = set()
 
-    def scrape_url(self, url: str, **kwargs) -> List[Dict[str, Any]]:
+    async def scrape_url(self, url: str, **kwargs) -> List[Dict[str, Any]]:
         """
-        Scrape a single URL.
+        Scrape a single URL using intelligent escalation.
         
         Args:
             url: URL to scrape
             **kwargs: Additional scraping parameters:
+                - escalation_level: Starting escalation level (default: from config)
+                - max_escalations: Maximum number of escalations (default: 2)
                 - parser_type: Type of parser to use ('html', 'json')
                 - selectors: CSS selectors for HTML parsing
                 - extract_links: Whether to extract links
@@ -71,35 +84,53 @@ class Scraper:
         try:
             self.logger.info(f"Scraping URL: {url}")
             
-            # Fetch content
-            response = self.session_manager.get(url)
-            content = response.text
-            content_type = response.headers.get('content-type', '').lower()
+            # Get escalation parameters
+            escalation_level = kwargs.get("escalation_level", self.default_escalation_level)
+            max_escalations = kwargs.get("max_escalations", 2)
+            
+            # Fetch content using intelligent escalation
+            fetch_result = await self.detection_controller.fetch_html_with_escalation(
+                url, 
+                start_level=escalation_level,
+                max_escalations=max_escalations
+            )
+            
+            # Check if fetch was successful
+            if fetch_result.get('error') and not fetch_result.get('html_content'):
+                raise GetScrapperError(f"Failed to fetch content: {fetch_result['error']}")
+            
+            # Get HTML content
+            html_content = fetch_result.get('html_content', '')
+            content_type = 'text/html'  # Default for browser-rendered content
             
             # Determine parser type
-            parser_type = kwargs.get("parser_type")
-            if not parser_type:
-                if "json" in content_type:
-                    parser_type = "json"
-                else:
-                    parser_type = "html"
+            parser_type = kwargs.get("parser_type", "html")
             
             # Parse content
             if parser_type == "html":
                 # Pass base URL for resolving relative links
                 parse_kwargs = kwargs.copy()
-                parse_kwargs["base_url"] = url
-                parsed_data = self.html_parser.parse(content, **parse_kwargs)
+                parse_kwargs["base_url"] = fetch_result.get('final_url', url)
+                parsed_data = self.html_parser.parse(html_content, **parse_kwargs)
             elif parser_type == "json":
-                parsed_data = self.json_parser.parse(content, **kwargs)
+                parsed_data = self.json_parser.parse(html_content, **kwargs)
             else:
                 raise ParsingError(f"Unsupported parser type: {parser_type}")
             
-            # Add URL to each data item
+            # Add metadata to each data item
             for item in parsed_data:
                 item["url"] = url
+                item["final_url"] = fetch_result.get('final_url', url)
                 item["content_type"] = content_type
-                item["status_code"] = response.status_code
+                item["status_code"] = fetch_result.get('status_code', 0)
+                item["render_time"] = fetch_result.get('render_time', 0)
+                item["strategy_used"] = fetch_result.get('strategy_used', 'unknown')
+                item["escalation_level"] = fetch_result.get('escalation_level', 0)
+                item["escalation_successful"] = fetch_result.get('escalation_successful', False)
+                
+                # Add detection analysis if available
+                if fetch_result.get('detection_analysis'):
+                    item["detection_analysis"] = fetch_result['detection_analysis']
             
             # Process data if requested
             if kwargs.get("process_data", True):
@@ -110,14 +141,14 @@ class Scraper:
                 output_format = kwargs.get("output_format", "json")
                 self._save_data(parsed_data, url, output_format)
             
-            self.logger.info(f"Successfully scraped {len(parsed_data)} items from {url}")
+            self.logger.info(f"Successfully scraped {len(parsed_data)} items from {url} using {fetch_result.get('strategy_used', 'unknown')} strategy")
             return parsed_data
             
         except Exception as e:
             self.logger.error(f"Failed to scrape {url}: {str(e)}")
             raise GetScrapperError(f"Failed to scrape {url}: {str(e)}")
 
-    def scrape_urls(self, urls: List[str], **kwargs) -> List[Dict[str, Any]]:
+    async def scrape_urls(self, urls: List[str], **kwargs) -> List[Dict[str, Any]]:
         """
         Scrape multiple URLs.
         
@@ -132,7 +163,7 @@ class Scraper:
         
         for url in urls:
             try:
-                data = self.scrape_url(url, **kwargs)
+                data = await self.scrape_url(url, **kwargs)
                 all_data.extend(data)
             except Exception as e:
                 self.logger.error(f"Failed to scrape {url}: {str(e)}")
@@ -141,7 +172,7 @@ class Scraper:
         
         return all_data
 
-    def scrape_recursive(self, start_url: str, max_depth: int = 2, **kwargs) -> List[Dict[str, Any]]:
+    async def scrape_recursive(self, start_url: str, max_depth: int = 2, **kwargs) -> List[Dict[str, Any]]:
         """
         Scrape URLs recursively following links.
         
@@ -157,9 +188,9 @@ class Scraper:
             List of all scraped data dictionaries
         """
         self.visited_urls.clear()  # Reset visited URLs for new recursive scraping
-        return self._scrape_recursive_internal(start_url, max_depth, 0, **kwargs)
+        return await self._scrape_recursive_internal(start_url, max_depth, 0, **kwargs)
 
-    def _scrape_recursive_internal(self, url: str, max_depth: int, current_depth: int, **kwargs) -> List[Dict[str, Any]]:
+    async def _scrape_recursive_internal(self, url: str, max_depth: int, current_depth: int, **kwargs) -> List[Dict[str, Any]]:
         """Internal recursive scraping method."""
         all_data = []
         
@@ -176,7 +207,7 @@ class Scraper:
             # Scrape current URL with link extraction enabled
             scrape_kwargs = kwargs.copy()
             scrape_kwargs["extract_links"] = True
-            data = self.scrape_url(url, **scrape_kwargs)
+            data = await self.scrape_url(url, **scrape_kwargs)
             all_data.extend(data)
             
             # If we haven't reached max depth, follow links
@@ -195,7 +226,7 @@ class Scraper:
                         continue
                     
                     # Recursively scrape the link
-                    recursive_data = self._scrape_recursive_internal(
+                    recursive_data = await self._scrape_recursive_internal(
                         link_url, max_depth, current_depth + 1, **kwargs
                     )
                     all_data.extend(recursive_data)
@@ -220,7 +251,7 @@ class Scraper:
         parsed = urlparse(url)
         return parsed.netloc
 
-    def scrape_from_file(self, file_path: str, **kwargs) -> List[Dict[str, Any]]:
+    async def scrape_from_file(self, file_path: str, **kwargs) -> List[Dict[str, Any]]:
         """
         Scrape URLs from a file.
         
@@ -235,7 +266,7 @@ class Scraper:
             with open(file_path, 'r', encoding='utf-8') as f:
                 urls = [line.strip() for line in f if line.strip()]
             
-            return self.scrape_urls(urls, **kwargs)
+            return await self.scrape_urls(urls, **kwargs)
             
         except Exception as e:
             raise GetScrapperError(f"Failed to read URLs from file {file_path}: {str(e)}")
@@ -289,17 +320,19 @@ class Scraper:
     def get_scraping_stats(self) -> Dict[str, Any]:
         """Get scraping statistics."""
         return {
-            "session_info": self.session_manager.get_session_info(),
+            "detection_controller_info": self.detection_controller.get_strategy_info(),
+            "available_strategies": self.detection_controller.get_available_strategies(),
             "output_directory": self.output_dir,
             "supported_parsers": ["html", "json"],
             "supported_formats": ["csv", "json"],
             "visited_urls_count": len(self.visited_urls),
             "recursive_scraping_enabled": True,
+            "default_escalation_level": self.default_escalation_level.value,
         }
 
     def close(self) -> None:
         """Close scraper and cleanup resources."""
-        self.session_manager.close()
+        self.detection_controller.close()
         self.logger.info("Scraper closed")
 
     def __enter__(self):

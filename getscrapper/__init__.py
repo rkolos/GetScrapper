@@ -13,9 +13,18 @@ from .core.session import SessionManager
 from .parsers.html_parser import HTMLParser
 from .parsers.json_parser import JSONParser
 from .processors.data_processor import DataProcessor
-from .storage.csv_storage import CSVStorage
+
+try:
+    from .storage.csv_storage import CSVStorage
+except ImportError:
+    from .storage.simple_csv_storage import SimpleCSVStorage as CSVStorage
+
 from .storage.json_storage import JSONStorage
-from .config.settings import Settings
+
+try:
+    from .config.settings import Settings
+except ImportError:
+    from .config.simple_settings import SimpleSettings as Settings
 
 __all__ = [
     "Scraper",
