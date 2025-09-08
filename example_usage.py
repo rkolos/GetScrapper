@@ -5,30 +5,35 @@
 
 import asyncio
 import json
+import logging
 from main_controller import UniversalRenderer, get_universal_html
+from getscrapper.utils.logger import setup_logger
+
+# Настройка логирования
+logger = setup_logger("example_usage", "INFO")
 
 
 async def basic_usage_example():
     """Базовый пример использования"""
-    print("=== Basic Usage Example ===")
+    logger.info("=== Basic Usage Example ===")
     
     # Простое использование
     url = "https://example.com"
     result = await get_universal_html(url)
     
-    print(f"URL: {url}")
-    print(f"Source: {result['source']}")
-    print(f"Title: {result['page_title']}")
-    print(f"Content Length: {result['content_length']} bytes")
-    print(f"Render Time: {result['render_time']:.2f}s")
+    logger.info(f"URL: {url}")
+    logger.info(f"Source: {result['source']}")
+    logger.info(f"Title: {result['page_title']}")
+    logger.info(f"Content Length: {result['content_length']} bytes")
+    logger.info(f"Render Time: {result['render_time']:.2f}s")
     
     if result.get('escalation_reason'):
-        print(f"Escalated: {result['escalation_reason']}")
+        logger.info(f"Escalated: {result['escalation_reason']}")
 
 
 async def advanced_usage_example():
     """Продвинутый пример с настройками"""
-    print("\n=== Advanced Usage Example ===")
+    logger.info("\n=== Advanced Usage Example ===")
     
     # Создаем рендерер с настройками
     renderer = UniversalRenderer(
@@ -45,7 +50,7 @@ async def advanced_usage_example():
     results = []
     
     for url in urls:
-        print(f"\nProcessing: {url}")
+        logger.info(f"\nProcessing: {url}")
         result = await renderer.get_universal_html(url)
         
         results.append({
@@ -57,24 +62,24 @@ async def advanced_usage_example():
             'escalated': result.get('escalation_reason') is not None
         })
         
-        print(f"  Source: {result['source']}")
-        print(f"  Title: {result['page_title']}")
-        print(f"  Content: {result['content_length']} bytes")
-        print(f"  Time: {result['render_time']:.2f}s")
+        logger.info(f"  Source: {result['source']}")
+        logger.info(f"  Title: {result['page_title']}")
+        logger.info(f"  Content: {result['content_length']} bytes")
+        logger.info(f"  Time: {result['render_time']:.2f}s")
         
         if result.get('escalation_reason'):
-            print(f"  Escalated: {result['escalation_reason']}")
+            logger.info(f"  Escalated: {result['escalation_reason']}")
     
     # Сохраняем результаты
     with open('render_results.json', 'w') as f:
         json.dump(results, f, indent=2)
     
-    print(f"\nResults saved to render_results.json")
+    logger.info(f"\nResults saved to render_results.json")
 
 
 async def batch_processing_example():
     """Пример пакетной обработки"""
-    print("\n=== Batch Processing Example ===")
+    logger.info("\n=== Batch Processing Example ===")
     
     # Список URL для обработки
     urls = [
@@ -93,37 +98,37 @@ async def batch_processing_example():
     escalated = 0
     
     for i, url in enumerate(urls, 1):
-        print(f"\n[{i}/{len(urls)}] Processing: {url}")
+        logger.info(f"\n[{i}/{len(urls)}] Processing: {url}")
         
         try:
             result = await renderer.get_universal_html(url)
             
             if result.get('error'):
-                print(f"  ❌ Failed: {result['error']}")
+                logger.info(f"  ❌ Failed: {result['error']}")
                 failed += 1
             else:
-                print(f"  ✅ Success: {result['content_length']} bytes in {result['render_time']:.2f}s")
+                logger.info(f"  ✅ Success: {result['content_length']} bytes in {result['render_time']:.2f}s")
                 successful += 1
                 
                 if result.get('escalation_reason'):
-                    print(f"  🔄 Escalated: {result['escalation_reason']}")
+                    logger.info(f"  🔄 Escalated: {result['escalation_reason']}")
                     escalated += 1
         
         except Exception as e:
-            print(f"  ❌ Exception: {str(e)}")
+            logger.info(f"  ❌ Exception: {str(e)}")
             failed += 1
     
-    print(f"\nBatch Processing Summary:")
-    print(f"  Total URLs: {len(urls)}")
-    print(f"  Successful: {successful}")
-    print(f"  Failed: {failed}")
-    print(f"  Escalated: {escalated}")
-    print(f"  Success Rate: {successful/len(urls)*100:.1f}%")
+    logger.info(f"\nBatch Processing Summary:")
+    logger.info(f"  Total URLs: {len(urls)}")
+    logger.info(f"  Successful: {successful}")
+    logger.info(f"  Failed: {failed}")
+    logger.info(f"  Escalated: {escalated}")
+    logger.info(f"  Success Rate: {successful/len(urls)*100:.1f}%")
 
 
 async def error_handling_example():
     """Пример обработки ошибок"""
-    print("\n=== Error Handling Example ===")
+    logger.info("\n=== Error Handling Example ===")
     
     # Тестируем различные типы ошибок
     test_cases = [
@@ -148,25 +153,25 @@ async def error_handling_example():
     renderer = UniversalRenderer(local_timeout=5000)  # 5 секунд
     
     for test_case in test_cases:
-        print(f"\nTesting: {test_case['description']}")
-        print(f"URL: {test_case['url']}")
+        logger.info(f"\nTesting: {test_case['description']}")
+        logger.info(f"URL: {test_case['url']}")
         
         try:
             result = await renderer.get_universal_html(test_case['url'])
             
             if result.get('error'):
-                print(f"  ❌ Error: {result['error']}")
+                logger.info(f"  ❌ Error: {result['error']}")
             else:
-                print(f"  ✅ Success: Status {result['status_code']}")
-                print(f"  Content: {result['content_length']} bytes")
+                logger.info(f"  ✅ Success: Status {result['status_code']}")
+                logger.info(f"  Content: {result['content_length']} bytes")
         
         except Exception as e:
-            print(f"  ❌ Exception: {str(e)}")
+            logger.info(f"  ❌ Exception: {str(e)}")
 
 
 async def detection_analysis_example():
     """Пример анализа детекции"""
-    print("\n=== Detection Analysis Example ===")
+    logger.info("\n=== Detection Analysis Example ===")
     
     # Тестируем детекцию на различных типах контента
     test_urls = [
@@ -187,33 +192,33 @@ async def detection_analysis_example():
     renderer = UniversalRenderer()
     
     for test_case in test_urls:
-        print(f"\n--- {test_case['expected']} ---")
-        print(f"URL: {test_case['url']}")
+        logger.info(f"\n--- {test_case['expected']} ---")
+        logger.info(f"URL: {test_case['url']}")
         
         result = await renderer.get_universal_html(test_case['url'])
         
         if result.get('detection_analysis'):
             analysis = result['detection_analysis']
             
-            print(f"Detection Results:")
-            print(f"  Blocked: {analysis['is_blocked']}")
-            print(f"  Confidence: {analysis['confidence_score']:.2f}")
+            logger.info(f"Detection Results:")
+            logger.info(f"  Blocked: {analysis['is_blocked']}")
+            logger.info(f"  Confidence: {analysis['confidence_score']:.2f}")
             
             if analysis['blocking_reasons']:
-                print("  Blocking Reasons:")
+                logger.info("  Blocking Reasons:")
                 for reason in analysis['blocking_reasons']:
-                    print(f"    - {reason}")
+                    logger.info(f"    - {reason}")
             
-            print("  Rule Results:")
+            logger.info("  Rule Results:")
             for rule, rule_result in analysis['rule_results'].items():
                 status = "BLOCKED" if rule_result.get('blocked') else "OK"
-                print(f"    {rule}: {status}")
+                logger.info(f"    {rule}: {status}")
 
 
 async def main():
     """Главная функция с примерами"""
-    print("Universal HTML Renderer - Usage Examples")
-    print("=" * 60)
+    logger.info("Universal HTML Renderer - Usage Examples")
+    logger.info("=" * 60)
     
     await basic_usage_example()
     await advanced_usage_example()
@@ -221,14 +226,14 @@ async def main():
     await error_handling_example()
     await detection_analysis_example()
     
-    print("\n" + "=" * 60)
-    print("✅ All examples completed!")
-    print("\nTo use with Browserbase fallback:")
-    print("1. Set environment variables:")
-    print("   export BROWSERBASE_API_KEY='your_api_key'")
-    print("   export BROWSERBASE_PROJECT_ID='your_project_id'")
-    print("2. Or pass credentials directly:")
-    print("   renderer = UniversalRenderer(browserbase_api_key='key', browserbase_project_id='id')")
+    logger.info("\n" + "=" * 60)
+    logger.info("✅ All examples completed!")
+    logger.info("\nTo use with Browserbase fallback:")
+    logger.info("1. Set environment variables:")
+    logger.info("   export BROWSERBASE_API_KEY='your_api_key'")
+    logger.info("   export BROWSERBASE_PROJECT_ID='your_project_id'")
+    logger.info("2. Or pass credentials directly:")
+    logger.info("   renderer = UniversalRenderer(browserbase_api_key='key', browserbase_project_id='id')")
 
 
 if __name__ == "__main__":

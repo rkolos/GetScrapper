@@ -210,15 +210,15 @@ if __name__ == "__main__":
         
         test_url = "https://example.com"
         
-        print(f"Testing Browserbase with URL: {test_url}")
+        logger.info(f"Testing Browserbase with URL: {test_url}")
         result = await fetch_via_browserbase(test_url, API_KEY, PROJECT_ID)
         
-        print(f"Title: {result['page_title']}")
-        print(f"Final URL: {result['final_url']}")
-        print(f"Content Length: {result['content_length']}")
-        print(f"Render Time: {result['render_time']:.2f}s")
+        logger.info(f"Title: {result['page_title']}")
+        logger.info(f"Final URL: {result['final_url']}")
+        logger.info(f"Content Length: {result['content_length']}")
+        logger.info(f"Render Time: {result['render_time']:.2f}s")
         if result['error']:
-            print(f"Error: {result['error']}")
+            logger.info(f"Error: {result['error']}")
     
     # Раскомментируйте для тестирования
     # asyncio.run(test_browserbase())

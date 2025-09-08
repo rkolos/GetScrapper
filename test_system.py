@@ -5,13 +5,18 @@
 
 import asyncio
 import sys
+import logging
 from main_controller import UniversalRenderer
 from detection_engine import DetectionEngine
+from getscrapper.utils.logger import setup_logger
+
+# Настройка логирования
+logger = setup_logger("test_system", "INFO")
 
 
 async def test_detection_engine():
     """Тестирование движка детекции"""
-    print("=== Testing Detection Engine ===")
+    logger.info("=== Testing Detection Engine ===")
     
     engine = DetectionEngine()
     
@@ -64,30 +69,30 @@ async def test_detection_engine():
     ]
     
     for test_case in test_cases:
-        print(f"\n--- {test_case['name']} ---")
+        logger.info(f"\n--- {test_case['name']} ---")
         is_blocked, analysis = engine.analyze(test_case['data'])
         
-        print(f"Expected blocked: {test_case['expected_blocked']}")
-        print(f"Actual blocked: {is_blocked}")
-        print(f"Confidence: {analysis['confidence_score']:.2f}")
+        logger.info(f"Expected blocked: {test_case['expected_blocked']}")
+        logger.info(f"Actual blocked: {is_blocked}")
+        logger.info(f"Confidence: {analysis['confidence_score']:.2f}")
         
         if analysis['blocking_reasons']:
-            print(f"Reasons: {', '.join(analysis['blocking_reasons'])}")
+            logger.info(f"Reasons: {', '.join(analysis['blocking_reasons'])}")
         
         # Проверяем результат
         if is_blocked == test_case['expected_blocked']:
-            print("✅ PASS")
+            logger.info("✅ PASS")
         else:
-            print("❌ FAIL")
+            logger.error("❌ FAIL")
             return False
     
-    print("\n✅ All detection engine tests passed!")
+    logger.info("\n✅ All detection engine tests passed!")
     return True
 
 
 async def test_universal_renderer():
     """Тестирование универсального рендерера"""
-    print("\n=== Testing Universal Renderer ===")
+    logger.info("\n=== Testing Universal Renderer ===")
     
     # Создаем рендерер без Browserbase для тестирования
     renderer = UniversalRenderer()
@@ -107,50 +112,50 @@ async def test_universal_renderer():
     ]
     
     for test_case in test_urls:
-        print(f"\n--- {test_case['name']} ---")
-        print(f"URL: {test_case['url']}")
+        logger.info(f"\n--- {test_case['name']} ---")
+        logger.info(f"URL: {test_case['url']}")
         
         try:
             result = await renderer.get_universal_html(test_case['url'])
             
-            print(f"Source: {result.get('source', 'unknown')}")
-            print(f"Title: {result.get('page_title', 'N/A')}")
-            print(f"Status: {result.get('status_code', 'N/A')}")
-            print(f"Content Length: {result.get('content_length', 0)}")
-            print(f"Render Time: {result.get('render_time', 0):.2f}s")
+            logger.info(f"Source: {result.get('source', 'unknown')}")
+            logger.info(f"Title: {result.get('page_title', 'N/A')}")
+            logger.info(f"Status: {result.get('status_code', 'N/A')}")
+            logger.info(f"Content Length: {result.get('content_length', 0)}")
+            logger.info(f"Render Time: {result.get('render_time', 0):.2f}s")
             
             if result.get('escalation_reason'):
-                print(f"Escalation: {result['escalation_reason']}")
+                logger.info(f"Escalation: {result['escalation_reason']}")
             
             if result.get('error'):
-                print(f"Error: {result['error']}")
-                print("❌ FAIL - Render error")
+                logger.info(f"Error: {result['error']}")
+                logger.error("❌ FAIL - Render error")
                 return False
             
             # Проверяем ожидания
             if test_case['expect_local'] and result.get('source') != 'local':
-                print("❌ FAIL - Expected local render")
+                logger.error("❌ FAIL - Expected local render")
                 return False
             
-            print("✅ PASS")
+            logger.info("✅ PASS")
             
         except Exception as e:
-            print(f"❌ FAIL - Exception: {str(e)}")
+            logger.error(f"❌ FAIL - Exception: {str(e)}")
             return False
     
-    print("\n✅ All universal renderer tests passed!")
+    logger.info("\n✅ All universal renderer tests passed!")
     return True
 
 
 async def test_integration():
     """Интеграционный тест"""
-    print("\n=== Integration Test ===")
+    logger.info("\n=== Integration Test ===")
     
     renderer = UniversalRenderer()
     
     # Тестируем полный цикл
     test_url = "https://httpbin.org/html"
-    print(f"Testing full cycle with: {test_url}")
+    logger.info(f"Testing full cycle with: {test_url}")
     
     result = await renderer.get_universal_html(test_url)
     
@@ -160,27 +165,27 @@ async def test_integration():
     
     for field in required_fields:
         if field not in result:
-            print(f"❌ FAIL - Missing field: {field}")
+            logger.error(f"❌ FAIL - Missing field: {field}")
             return False
     
     # Проверяем, что HTML не пустой
     if not result['html_content']:
-        print("❌ FAIL - Empty HTML content")
+        logger.error("❌ FAIL - Empty HTML content")
         return False
     
     # Проверяем, что время рендеринга разумное
     if result['render_time'] < 0 or result['render_time'] > 60:
-        print(f"❌ FAIL - Unreasonable render time: {result['render_time']}")
+        logger.error(f"❌ FAIL - Unreasonable render time: {result['render_time']}")
         return False
     
-    print("✅ Integration test passed!")
+    logger.info("✅ Integration test passed!")
     return True
 
 
 async def main():
     """Главная функция тестирования"""
-    print("Universal Renderer System Test")
-    print("=" * 50)
+    logger.info("Universal Renderer System Test")
+    logger.info("=" * 50)
     
     tests = [
         ("Detection Engine", test_detection_engine),
@@ -197,15 +202,15 @@ async def main():
             if result:
                 passed += 1
             else:
-                print(f"\n❌ {test_name} test failed!")
+                logger.error(f"\n❌ {test_name} test failed!")
                 sys.exit(1)
         except Exception as e:
-            print(f"\n❌ {test_name} test crashed: {str(e)}")
+            logger.error(f"\n❌ {test_name} test crashed: {str(e)}")
             sys.exit(1)
     
-    print(f"\n{'='*50}")
-    print(f"All tests passed! ({passed}/{total})")
-    print("✅ System is ready for use!")
+    logger.info(f"\n{'='*50}")
+    logger.info(f"All tests passed! ({passed}/{total})")
+    logger.info("✅ System is ready for use!")
 
 
 if __name__ == "__main__":

@@ -174,15 +174,15 @@ if __name__ == "__main__":
         ]
         
         for url in test_urls:
-            print(f"\n=== Testing: {url} ===")
+            logger.info(f"\n=== Testing: {url} ===")
             result = await fetch_js_local(url)
-            print(f"Title: {result['page_title']}")
-            print(f"Final URL: {result['final_url']}")
-            print(f"Status: {result['status_code']}")
-            print(f"Content Length: {result['content_length']}")
-            print(f"Render Time: {result['render_time']:.2f}s")
+            logger.info(f"Title: {result['page_title']}")
+            logger.info(f"Final URL: {result['final_url']}")
+            logger.info(f"Status: {result['status_code']}")
+            logger.info(f"Content Length: {result['content_length']}")
+            logger.info(f"Render Time: {result['render_time']:.2f}s")
             if result['error']:
-                print(f"Error: {result['error']}")
+                logger.error(f"Error: {result['error']}")
     
     # Запуск теста
     asyncio.run(test_local_render())

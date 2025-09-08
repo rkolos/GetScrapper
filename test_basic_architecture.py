@@ -4,35 +4,41 @@
 
 import sys
 import os
+import logging
 
 # Добавляем путь к модулю
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'getscrapper'))
+
+from getscrapper.utils.logger import setup_logger
+
+# Настройка логирования
+logger = setup_logger("test_basic_architecture", "INFO")
 
 def test_imports():
     """Тестируем импорты основных компонентов."""
     try:
         from getscrapper.core.detection_engine import DetectionEngine
-        print("✓ DetectionEngine импортирован успешно")
+        logger.info("✓ DetectionEngine импортирован успешно")
         
         from getscrapper.core.fetchers.base_fetcher import FetcherStrategy
-        print("✓ FetcherStrategy импортирован успешно")
+        logger.info("✓ FetcherStrategy импортирован успешно")
         
         from getscrapper.core.fetchers.static_fetcher import StaticFetcher
-        print("✓ StaticFetcher импортирован успешно")
+        logger.info("✓ StaticFetcher импортирован успешно")
         
         from getscrapper.core.detection_controller import DetectionController, EscalationLevel
-        print("✓ DetectionController и EscalationLevel импортированы успешно")
+        logger.info("✓ DetectionController и EscalationLevel импортированы успешно")
         
         # Тестируем импорт без pydantic зависимостей
         from getscrapper.config.simple_settings import SimpleSettings
-        print("✓ SimpleSettings импортирован успешно")
+        logger.info("✓ SimpleSettings импортирован успешно")
         
         from getscrapper.processors.simple_validators import DataValidator
-        print("✓ DataValidator импортирован успешно")
+        logger.info("✓ DataValidator импортирован успешно")
         
         return True
     except Exception as e:
-        print(f"✗ Ошибка импорта: {e}")
+        logger.error(f"✗ Ошибка импорта: {e}")
         return False
 
 def test_detection_engine():
@@ -41,7 +47,7 @@ def test_detection_engine():
         from getscrapper.core.detection_engine import DetectionEngine
         
         engine = DetectionEngine()
-        print("✓ DetectionEngine создан успешно")
+        logger.info("✓ DetectionEngine создан успешно")
         
         # Тестовые данные
         test_data = {
@@ -53,11 +59,11 @@ def test_detection_engine():
         }
         
         is_blocked, analysis = engine.analyze(test_data)
-        print(f"✓ Анализ выполнен: заблокировано={is_blocked}, уверенность={analysis['confidence_score']:.2f}")
+        logger.info(f"✓ Анализ выполнен: заблокировано={is_blocked}, уверенность={analysis['confidence_score']:.2f}")
         
         return True
     except Exception as e:
-        print(f"✗ Ошибка DetectionEngine: {e}")
+        logger.error(f"✗ Ошибка DetectionEngine: {e}")
         return False
 
 def test_escalation_levels():
@@ -66,11 +72,11 @@ def test_escalation_levels():
         from getscrapper.core.detection_controller import EscalationLevel
         
         levels = [EscalationLevel.STATIC, EscalationLevel.LOCAL_BROWSER, EscalationLevel.BROWSERBASE]
-        print(f"✓ EscalationLevel: {[level.value for level in levels]}")
+        logger.info(f"✓ EscalationLevel: {[level.value for level in levels]}")
         
         return True
     except Exception as e:
-        print(f"✗ Ошибка EscalationLevel: {e}")
+        logger.error(f"✗ Ошибка EscalationLevel: {e}")
         return False
 
 def test_detection_controller():
@@ -86,22 +92,22 @@ def test_detection_controller():
         }
         
         controller = DetectionController(config)
-        print("✓ DetectionController создан успешно")
+        logger.info("✓ DetectionController создан успешно")
         
         available = controller.get_available_strategies()
-        print(f"✓ Доступные стратегии: {available}")
+        logger.info(f"✓ Доступные стратегии: {available}")
         
         info = controller.get_strategy_info()
-        print(f"✓ Информация о стратегиях: {list(info.keys())}")
+        logger.info(f"✓ Информация о стратегиях: {list(info.keys())}")
         
         return True
     except Exception as e:
-        print(f"✗ Ошибка DetectionController: {e}")
+        logger.error(f"✗ Ошибка DetectionController: {e}")
         return False
 
 def main():
     """Главная функция тестирования."""
-    print("=== Тестирование базовой архитектуры GetScrapper ===\n")
+    logger.info("=== Тестирование базовой архитектуры GetScrapper ===\n")
     
     tests = [
         ("Импорты", test_imports),
@@ -114,23 +120,23 @@ def main():
     total = len(tests)
     
     for test_name, test_func in tests:
-        print(f"Тест: {test_name}")
+        logger.info(f"Тест: {test_name}")
         try:
             if test_func():
                 passed += 1
-                print(f"✓ {test_name} - ПРОЙДЕН\n")
+                logger.info(f"✓ {test_name} - ПРОЙДЕН\n")
             else:
-                print(f"✗ {test_name} - ПРОВАЛЕН\n")
+                logger.error(f"✗ {test_name} - ПРОВАЛЕН\n")
         except Exception as e:
-            print(f"✗ {test_name} - ОШИБКА: {e}\n")
+            logger.error(f"✗ {test_name} - ОШИБКА: {e}\n")
     
-    print(f"=== Результаты: {passed}/{total} тестов пройдено ===")
+    logger.info(f"=== Результаты: {passed}/{total} тестов пройдено ===")
     
     if passed == total:
-        print("🎉 Все базовые тесты пройдены успешно!")
+        logger.info("🎉 Все базовые тесты пройдены успешно!")
         return True
     else:
-        print("❌ Некоторые тесты провалены")
+        logger.info("❌ Некоторые тесты провалены")
         return False
 
 if __name__ == "__main__":

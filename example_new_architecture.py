@@ -59,15 +59,15 @@ async def test_new_architecture():
         # "https://httpbin.org/delay/5",  # Медленная страница
     ]
     
-    print("=== Новая архитектура GetScrapper ===")
-    print(f"Доступные стратегии: {scraper.detection_controller.get_available_strategies()}")
-    print(f"Информация о стратегиях: {scraper.detection_controller.get_strategy_info()}")
-    print()
+    logger.info("=== Новая архитектура GetScrapper ===")
+    logger.info(f"Доступные стратегии: {scraper.detection_controller.get_available_strategies()}")
+    logger.info(f"Информация о стратегиях: {scraper.detection_controller.get_strategy_info()}")
+    logger.info()
     
     for url in test_urls:
-        print(f"\n{'='*60}")
-        print(f"Тестирование: {url}")
-        print('='*60)
+        logger.info(f"\n{'='*60}")
+        logger.info(f"Тестирование: {url}")
+        logger.info('='*60)
         
         try:
             # Скрапинг с автоматической эскалацией
@@ -83,42 +83,42 @@ async def test_new_architecture():
             if data:
                 # Показываем результаты
                 first_item = data[0]
-                print(f"Успешно получено {len(data)} элементов")
-                print(f"Стратегия: {first_item.get('strategy_used', 'unknown')}")
-                print(f"Уровень эскалации: {first_item.get('escalation_level', 0)}")
-                print(f"Эскалация успешна: {first_item.get('escalation_successful', False)}")
-                print(f"Финальный URL: {first_item.get('final_url', 'N/A')}")
-                print(f"Время рендеринга: {first_item.get('render_time', 0):.2f}s")
+                logger.info(f"Успешно получено {len(data)} элементов")
+                logger.info(f"Стратегия: {first_item.get('strategy_used', 'unknown')}")
+                logger.info(f"Уровень эскалации: {first_item.get('escalation_level', 0)}")
+                logger.info(f"Эскалация успешна: {first_item.get('escalation_successful', False)}")
+                logger.info(f"Финальный URL: {first_item.get('final_url', 'N/A')}")
+                logger.info(f"Время рендеринга: {first_item.get('render_time', 0):.2f}s")
                 
                 # Показываем анализ детекции если есть
                 if 'detection_analysis' in first_item:
                     analysis = first_item['detection_analysis']
-                    print(f"Анализ детекции:")
-                    print(f"  - Заблокировано: {analysis.get('is_blocked', False)}")
-                    print(f"  - Уверенность: {analysis.get('confidence_score', 0):.2f}")
+                    logger.info(f"Анализ детекции:")
+                    logger.info(f"  - Заблокировано: {analysis.get('is_blocked', False)}")
+                    logger.info(f"  - Уверенность: {analysis.get('confidence_score', 0):.2f}")
                     if analysis.get('blocking_reasons'):
-                        print(f"  - Причины блокировки: {', '.join(analysis['blocking_reasons'])}")
+                        logger.info(f"  - Причины блокировки: {', '.join(analysis['blocking_reasons'])}")
                 
                 # Показываем извлеченные данные
                 if first_item.get('type') == 'link':
-                    print(f"Извлеченные ссылки: {len([item for item in data if item.get('type') == 'link'])}")
+                    logger.info(f"Извлеченные ссылки: {len([item for item in data if item.get('type') == 'link'])}")
                 if first_item.get('type') == 'image':
-                    print(f"Извлеченные изображения: {len([item for item in data if item.get('type') == 'image'])}")
+                    logger.info(f"Извлеченные изображения: {len([item for item in data if item.get('type') == 'image'])}")
                 
             else:
-                print("Не удалось получить данные")
+                logger.info("Не удалось получить данные")
                 
         except Exception as e:
-            print(f"Ошибка при скрапинге: {str(e)}")
+            logger.info(f"Ошибка при скрапинге: {str(e)}")
     
     # Показываем статистику
-    print(f"\n{'='*60}")
-    print("Статистика скрапинга:")
-    print('='*60)
+    logger.info(f"\n{'='*60}")
+    logger.info("Статистика скрапинга:")
+    logger.info('='*60)
     stats = scraper.get_scraping_stats()
-    print(f"Посещенные URL: {stats['visited_urls_count']}")
-    print(f"Доступные стратегии: {stats['available_strategies']}")
-    print(f"Уровень эскалации по умолчанию: {stats['default_escalation_level']}")
+    logger.info(f"Посещенные URL: {stats['visited_urls_count']}")
+    logger.info(f"Доступные стратегии: {stats['available_strategies']}")
+    logger.info(f"Уровень эскалации по умолчанию: {stats['default_escalation_level']}")
     
     # Закрываем скрапер
     scraper.close()
@@ -141,39 +141,39 @@ async def test_escalation_levels():
     
     test_url = "https://quotes.toscrape.com/js/"
     
-    print(f"\n{'='*60}")
-    print("Тестирование различных уровней эскалации")
-    print('='*60)
+    logger.info(f"\n{'='*60}")
+    logger.info("Тестирование различных уровней эскалации")
+    logger.info('='*60)
     
     # Тест 1: Начинаем со статического
-    print(f"\n1. Начинаем со статического уровня:")
+    logger.info(f"\n1. Начинаем со статического уровня:")
     data = await scraper.scrape_url(
         test_url,
         escalation_level=EscalationLevel.STATIC,
         max_escalations=2
     )
     if data:
-        print(f"   Результат: {data[0].get('strategy_used')} (уровень {data[0].get('escalation_level')})")
+        logger.info(f"   Результат: {data[0].get('strategy_used')} (уровень {data[0].get('escalation_level')})")
     
     # Тест 2: Начинаем с локального браузера
-    print(f"\n2. Начинаем с локального браузера:")
+    logger.info(f"\n2. Начинаем с локального браузера:")
     data = await scraper.scrape_url(
         test_url,
         escalation_level=EscalationLevel.LOCAL_BROWSER,
         max_escalations=1
     )
     if data:
-        print(f"   Результат: {data[0].get('strategy_used')} (уровень {data[0].get('escalation_level')})")
+        logger.info(f"   Результат: {data[0].get('strategy_used')} (уровень {data[0].get('escalation_level')})")
     
     # Тест 3: Начинаем с Browserbase (если доступен)
-    print(f"\n3. Начинаем с Browserbase:")
+    logger.info(f"\n3. Начинаем с Browserbase:")
     data = await scraper.scrape_url(
         test_url,
         escalation_level=EscalationLevel.BROWSERBASE,
         max_escalations=0
     )
     if data:
-        print(f"   Результат: {data[0].get('strategy_used')} (уровень {data[0].get('escalation_level')})")
+        logger.info(f"   Результат: {data[0].get('strategy_used')} (уровень {data[0].get('escalation_level')})")
     
     scraper.close()
 
@@ -193,9 +193,9 @@ async def test_recursive_scraping():
     
     scraper = Scraper(config)
     
-    print(f"\n{'='*60}")
-    print("Тестирование рекурсивного скрапинга")
-    print('='*60)
+    logger.info(f"\n{'='*60}")
+    logger.info("Тестирование рекурсивного скрапинга")
+    logger.info('='*60)
     
     start_url = "https://quotes.toscrape.com/"
     
@@ -207,40 +207,40 @@ async def test_recursive_scraping():
             escalation_level=EscalationLevel.STATIC
         )
         
-        print(f"Рекурсивно получено {len(data)} элементов")
+        logger.info(f"Рекурсивно получено {len(data)} элементов")
         
         # Группируем по типам
         links = [item for item in data if item.get('type') == 'link']
         texts = [item for item in data if item.get('type') == 'text']
         
-        print(f"Ссылки: {len(links)}")
-        print(f"Тексты: {len(texts)}")
+        logger.info(f"Ссылки: {len(links)}")
+        logger.info(f"Тексты: {len(texts)}")
         
         # Показываем уникальные стратегии
         strategies_used = set(item.get('strategy_used', 'unknown') for item in data)
-        print(f"Использованные стратегии: {', '.join(strategies_used)}")
+        logger.info(f"Использованные стратегии: {', '.join(strategies_used)}")
         
     except Exception as e:
-        print(f"Ошибка при рекурсивном скрапинге: {str(e)}")
+        logger.info(f"Ошибка при рекурсивном скрапинге: {str(e)}")
     
     scraper.close()
 
 
 async def main():
     """Главная функция для запуска всех тестов."""
-    print("Запуск тестов новой архитектуры GetScrapper...")
+    logger.info("Запуск тестов новой архитектуры GetScrapper...")
     
     try:
         await test_new_architecture()
         await test_escalation_levels()
         await test_recursive_scraping()
         
-        print(f"\n{'='*60}")
-        print("Все тесты завершены успешно!")
-        print('='*60)
+        logger.info(f"\n{'='*60}")
+        logger.info("Все тесты завершены успешно!")
+        logger.info('='*60)
         
     except Exception as e:
-        print(f"Ошибка в тестах: {str(e)}")
+        logger.info(f"Ошибка в тестах: {str(e)}")
         import traceback
         traceback.print_exc()
 
