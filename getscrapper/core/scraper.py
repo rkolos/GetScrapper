@@ -1,7 +1,8 @@
 """Main scraper class for GetScrapper."""
 
 import os
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Set
+from urllib.parse import urljoin, urlparse
 
 from .session import SessionManager
 from ..parsers.html_parser import HTMLParser
@@ -44,6 +45,9 @@ class Scraper:
         # Output directory
         self.output_dir = self.config.get("output_dir", "./output")
         os.makedirs(self.output_dir, exist_ok=True)
+        
+        # Recursive scraping state
+        self.visited_urls: Set[str] = set()
 
     def scrape_url(self, url: str, **kwargs) -> List[Dict[str, Any]]:
         """
@@ -82,7 +86,10 @@ class Scraper:
             
             # Parse content
             if parser_type == "html":
-                parsed_data = self.html_parser.parse(content, **kwargs)
+                # Pass base URL for resolving relative links
+                parse_kwargs = kwargs.copy()
+                parse_kwargs["base_url"] = url
+                parsed_data = self.html_parser.parse(content, **parse_kwargs)
             elif parser_type == "json":
                 parsed_data = self.json_parser.parse(content, **kwargs)
             else:
@@ -133,6 +140,85 @@ class Scraper:
                     raise
         
         return all_data
+
+    def scrape_recursive(self, start_url: str, max_depth: int = 2, **kwargs) -> List[Dict[str, Any]]:
+        """
+        Scrape URLs recursively following links.
+        
+        Args:
+            start_url: Starting URL to scrape
+            max_depth: Maximum depth to follow links (default: 2)
+            **kwargs: Additional scraping parameters:
+                - same_domain_only: Only follow links from the same domain (default: True)
+                - extract_links: Whether to extract links (default: True)
+                - continue_on_error: Whether to continue on errors (default: True)
+                
+        Returns:
+            List of all scraped data dictionaries
+        """
+        self.visited_urls.clear()  # Reset visited URLs for new recursive scraping
+        return self._scrape_recursive_internal(start_url, max_depth, 0, **kwargs)
+
+    def _scrape_recursive_internal(self, url: str, max_depth: int, current_depth: int, **kwargs) -> List[Dict[str, Any]]:
+        """Internal recursive scraping method."""
+        all_data = []
+        
+        # Check if we've already visited this URL or exceeded max depth
+        if url in self.visited_urls or current_depth > max_depth:
+            return all_data
+        
+        # Mark URL as visited
+        self.visited_urls.add(url)
+        
+        try:
+            self.logger.info(f"[Depth {current_depth}] Scraping: {url}")
+            
+            # Scrape current URL with link extraction enabled
+            scrape_kwargs = kwargs.copy()
+            scrape_kwargs["extract_links"] = True
+            data = self.scrape_url(url, **scrape_kwargs)
+            all_data.extend(data)
+            
+            # If we haven't reached max depth, follow links
+            if current_depth < max_depth:
+                links = self._extract_links_from_data(data)
+                same_domain_only = kwargs.get("same_domain_only", True)
+                base_domain = self._get_domain(url) if same_domain_only else None
+                
+                for link_url in links:
+                    # Skip if we've already visited this URL
+                    if link_url in self.visited_urls:
+                        continue
+                    
+                    # Skip if it's from a different domain (when same_domain_only is True)
+                    if same_domain_only and base_domain and self._get_domain(link_url) != base_domain:
+                        continue
+                    
+                    # Recursively scrape the link
+                    recursive_data = self._scrape_recursive_internal(
+                        link_url, max_depth, current_depth + 1, **kwargs
+                    )
+                    all_data.extend(recursive_data)
+            
+        except Exception as e:
+            self.logger.error(f"Failed to scrape {url} at depth {current_depth}: {str(e)}")
+            if not kwargs.get("continue_on_error", True):
+                raise
+        
+        return all_data
+
+    def _extract_links_from_data(self, data: List[Dict[str, Any]]) -> List[str]:
+        """Extract links from scraped data."""
+        links = []
+        for item in data:
+            if item.get("type") == "link" and item.get("full_url"):
+                links.append(item["full_url"])
+        return links
+
+    def _get_domain(self, url: str) -> str:
+        """Extract domain from URL."""
+        parsed = urlparse(url)
+        return parsed.netloc
 
     def scrape_from_file(self, file_path: str, **kwargs) -> List[Dict[str, Any]]:
         """
@@ -207,6 +293,8 @@ class Scraper:
             "output_directory": self.output_dir,
             "supported_parsers": ["html", "json"],
             "supported_formats": ["csv", "json"],
+            "visited_urls_count": len(self.visited_urls),
+            "recursive_scraping_enabled": True,
         }
 
     def close(self) -> None:
