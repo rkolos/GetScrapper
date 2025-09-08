@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 async def test_detection_engine():
     """Тестирование улучшенного движка детекции"""
-    print("\n=== Тестирование движка детекции ===")
+    logger.info("\n=== Тестирование движка детекции ===")
     
     engine = DetectionEngine()
     
@@ -64,26 +64,26 @@ async def test_detection_engine():
     ]
     
     for test_case in test_cases:
-        print(f"\n--- {test_case['name']} ---")
+        logger.info(f"\n--- {test_case['name']} ---")
         is_blocked, analysis = engine.analyze(test_case['data'])
-        print(f"Заблокировано: {is_blocked}")
-        print(f"Уверенность: {analysis['confidence_score']:.2f}")
+        logger.info(f"Заблокировано: {is_blocked}")
+        logger.info(f"Уверенность: {analysis['confidence_score']:.2f}")
         if analysis['blocking_reasons']:
-            print(f"Причины блокировки: {', '.join(analysis['blocking_reasons'])}")
+            logger.info(f"Причины блокировки: {', '.join(analysis['blocking_reasons'])}")
 
 
 async def test_universal_renderer():
     """Тестирование универсального рендерера"""
-    print("\n=== Тестирование универсального рендерера ===")
+    logger.info("\n=== Тестирование универсального рендерера ===")
     
     # Создаем рендерер с настройками по умолчанию
     renderer = UniversalRenderer()
     
-    print(f"Конфигурация:")
-    print(f"  - Browserbase доступен: {renderer.browserbase_available}")
-    print(f"  - Headless режим: {renderer.local_headless}")
-    print(f"  - Таймаут: {renderer.local_timeout}ms")
-    print(f"  - Переиспользование контекста: {renderer.reuse_context}")
+    logger.info(f"Конфигурация:")
+    logger.info(f"  - Browserbase доступен: {renderer.browserbase_available}")
+    logger.info(f"  - Headless режим: {renderer.local_headless}")
+    logger.info(f"  - Таймаут: {renderer.local_timeout}ms")
+    logger.info(f"  - Переиспользование контекста: {renderer.reuse_context}")
     
     # Тестовые URL
     test_urls = [
@@ -92,52 +92,52 @@ async def test_universal_renderer():
     ]
     
     for url in test_urls:
-        print(f"\n--- Тестирование: {url} ---")
+        logger.info(f"\n--- Тестирование: {url} ---")
         try:
             result = await renderer.get_universal_html(url)
             
-            print(f"Источник: {result.get('source', 'unknown')}")
-            print(f"Заголовок: {result.get('page_title', 'N/A')}")
-            print(f"Финальный URL: {result.get('final_url', 'N/A')}")
-            print(f"Статус: {result.get('status_code', 'N/A')}")
-            print(f"Длина контента: {result.get('content_length', 0)}")
-            print(f"Время рендеринга: {result.get('render_time', 0):.2f}s")
+            logger.info(f"Источник: {result.get('source', 'unknown')}")
+            logger.info(f"Заголовок: {result.get('page_title', 'N/A')}")
+            logger.info(f"Финальный URL: {result.get('final_url', 'N/A')}")
+            logger.info(f"Статус: {result.get('status_code', 'N/A')}")
+            logger.info(f"Длина контента: {result.get('content_length', 0)}")
+            logger.info(f"Время рендеринга: {result.get('render_time', 0):.2f}s")
             
             if result.get('escalation_reason'):
-                print(f"Причина эскалации: {result['escalation_reason']}")
+                logger.info(f"Причина эскалации: {result['escalation_reason']}")
             
             if result.get('detection_analysis'):
                 analysis = result['detection_analysis']
-                print(f"Уверенность детекции: {analysis.get('confidence_score', 0):.2f}")
+                logger.info(f"Уверенность детекции: {analysis.get('confidence_score', 0):.2f}")
                 if analysis.get('blocking_reasons'):
-                    print(f"Причины блокировки: {', '.join(analysis['blocking_reasons'])}")
+                    logger.info(f"Причины блокировки: {', '.join(analysis['blocking_reasons'])}")
             
             if result.get('error'):
-                print(f"Ошибка: {result['error']}")
+                logger.error(f"Ошибка: {result['error']}")
                 
         except Exception as e:
-            print(f"Ошибка при тестировании {url}: {e}")
+            logger.error(f"Ошибка при тестировании {url}: {e}")
 
 
 async def test_configuration():
     """Тестирование конфигурации"""
-    print("\n=== Тестирование конфигурации ===")
+    logger.info("\n=== Тестирование конфигурации ===")
     
     from config import config
     
-    print("Текущая конфигурация:")
+    logger.info("Текущая конфигурация:")
     config_dict = config.to_dict()
     for key, value in config_dict.items():
-        print(f"  - {key}: {value}")
+        logger.info(f"  - {key}: {value}")
     
-    print(f"\nBrowserbase конфигурация валидна: {config.validate_browserbase_config()}")
-    print(f"User-Agent: {config.get_user_agent()}")
-    print(f"HTTP заголовки: {config.get_http_headers()}")
+    logger.info(f"\nBrowserbase конфигурация валидна: {config.validate_browserbase_config()}")
+    logger.info(f"User-Agent: {config.get_user_agent()}")
+    logger.info(f"HTTP заголовки: {config.get_http_headers()}")
 
 
 async def main():
     """Главная функция тестирования"""
-    print("🚀 Запуск тестирования улучшений универсального рендерера")
+    logger.info("🚀 Запуск тестирования улучшений универсального рендерера")
     
     try:
         # Тестируем конфигурацию
@@ -149,10 +149,10 @@ async def main():
         # Тестируем универсальный рендерер
         await test_universal_renderer()
         
-        print("\n✅ Все тесты завершены успешно!")
+        logger.info("\n✅ Все тесты завершены успешно!")
         
     except Exception as e:
-        print(f"\n❌ Ошибка при выполнении тестов: {e}")
+        logger.error(f"\n❌ Ошибка при выполнении тестов: {e}")
         logger.exception("Детали ошибки:")
 
 

@@ -233,35 +233,35 @@ if __name__ == "__main__":
         # Создаем рендерер (без Browserbase для тестирования)
         renderer = UniversalRenderer()
         
-        print("=== Universal Renderer Test ===")
-        print(f"Browserbase available: {renderer.browserbase_available}")
-        print(f"Stats: {renderer.get_stats()}")
+        logger.info("=== Universal Renderer Test ===")
+        logger.info(f"Browserbase available: {renderer.browserbase_available}")
+        logger.info(f"Stats: {renderer.get_stats()}")
         
         for url in test_urls:
-            print(f"\n{'='*60}")
-            print(f"Testing: {url}")
-            print('='*60)
+            logger.info(f"\n{'='*60}")
+            logger.info(f"Testing: {url}")
+            logger.info('='*60)
             
             result = await renderer.get_universal_html(url)
             
-            print(f"Source: {result.get('source', 'unknown')}")
-            print(f"Title: {result.get('page_title', 'N/A')}")
-            print(f"Final URL: {result.get('final_url', 'N/A')}")
-            print(f"Status: {result.get('status_code', 'N/A')}")
-            print(f"Content Length: {result.get('content_length', 0)}")
-            print(f"Render Time: {result.get('render_time', 0):.2f}s")
+            logger.info(f"Source: {result.get('source', 'unknown')}")
+            logger.info(f"Title: {result.get('page_title', 'N/A')}")
+            logger.info(f"Final URL: {result.get('final_url', 'N/A')}")
+            logger.info(f"Status: {result.get('status_code', 'N/A')}")
+            logger.info(f"Content Length: {result.get('content_length', 0)}")
+            logger.info(f"Render Time: {result.get('render_time', 0):.2f}s")
             
             if result.get('escalation_reason'):
-                print(f"Escalation Reason: {result['escalation_reason']}")
+                logger.warning(f"Escalation Reason: {result['escalation_reason']}")
             
             if result.get('detection_analysis'):
                 analysis = result['detection_analysis']
-                print(f"Detection Confidence: {analysis.get('confidence_score', 0):.2f}")
+                logger.info(f"Detection Confidence: {analysis.get('confidence_score', 0):.2f}")
                 if analysis.get('blocking_reasons'):
-                    print(f"Blocking Reasons: {', '.join(analysis['blocking_reasons'])}")
+                    logger.warning(f"Blocking Reasons: {', '.join(analysis['blocking_reasons'])}")
             
             if result.get('error'):
-                print(f"Error: {result['error']}")
+                logger.error(f"Error: {result['error']}")
     
     # Запуск тестов
     asyncio.run(test_universal_renderer())

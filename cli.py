@@ -7,9 +7,14 @@ import asyncio
 import argparse
 import json
 import sys
+import logging
 from typing import Optional
 from main_controller import UniversalRenderer, get_universal_html
 from config import config, validate_config
+from getscrapper.utils.logger import setup_logger
+
+# Настройка логирования
+logger = setup_logger("cli", "INFO")
 
 
 async def render_url(url: str, 
@@ -27,8 +32,8 @@ async def render_url(url: str,
         browserbase_api_key: API ключ Browserbase
         browserbase_project_id: ID проекта Browserbase
     """
-    print(f"Rendering URL: {url}")
-    print("-" * 50)
+    logger.info(f"Rendering URL: {url}")
+    logger.info("-" * 50)
     
     try:
         result = await get_universal_html(
@@ -38,55 +43,55 @@ async def render_url(url: str,
         )
         
         # Основная информация
-        print(f"Source: {result.get('source', 'unknown')}")
-        print(f"Title: {result.get('page_title', 'N/A')}")
-        print(f"Final URL: {result.get('final_url', 'N/A')}")
-        print(f"Status Code: {result.get('status_code', 'N/A')}")
-        print(f"Content Length: {result.get('content_length', 0)} bytes")
-        print(f"Render Time: {result.get('render_time', 0):.2f} seconds")
+        logger.info(f"Source: {result.get('source', 'unknown')}")
+        logger.info(f"Title: {result.get('page_title', 'N/A')}")
+        logger.info(f"Final URL: {result.get('final_url', 'N/A')}")
+        logger.info(f"Status Code: {result.get('status_code', 'N/A')}")
+        logger.info(f"Content Length: {result.get('content_length', 0)} bytes")
+        logger.info(f"Render Time: {result.get('render_time', 0):.2f} seconds")
         
         # Информация об эскалации
         if result.get('escalation_reason'):
-            print(f"Escalation Reason: {result['escalation_reason']}")
+            logger.warning(f"Escalation Reason: {result['escalation_reason']}")
         
         # Детальный анализ детекции
         if show_analysis and result.get('detection_analysis'):
             analysis = result['detection_analysis']
-            print(f"\nDetection Analysis:")
-            print(f"  Confidence Score: {analysis.get('confidence_score', 0):.2f}")
-            print(f"  Is Blocked: {analysis.get('is_blocked', False)}")
+            logger.info(f"\nDetection Analysis:")
+            logger.info(f"  Confidence Score: {analysis.get('confidence_score', 0):.2f}")
+            logger.info(f"  Is Blocked: {analysis.get('is_blocked', False)}")
             
             if analysis.get('blocking_reasons'):
-                print(f"  Blocking Reasons:")
+                logger.warning(f"  Blocking Reasons:")
                 for reason in analysis['blocking_reasons']:
-                    print(f"    - {reason}")
+                    logger.warning(f"    - {reason}")
             
             if analysis.get('rule_results'):
-                print(f"  Rule Results:")
+                logger.info(f"  Rule Results:")
                 for rule, result_data in analysis['rule_results'].items():
-                    print(f"    {rule}: {'BLOCKED' if result_data.get('blocked') else 'OK'}")
+                    logger.info(f"    {rule}: {'BLOCKED' if result_data.get('blocked') else 'OK'}")
         
         # Ошибки
         if result.get('error'):
-            print(f"\nError: {result['error']}")
+            logger.error(f"\nError: {result['error']}")
             sys.exit(1)
         
         # Сохранение HTML в файл
         if output_file and result.get('html_content'):
             with open(output_file, 'w', encoding='utf-8') as f:
                 f.write(result['html_content'])
-            print(f"\nHTML saved to: {output_file}")
+            logger.info(f"\nHTML saved to: {output_file}")
         
         # Вывод HTML в консоль (если не сохранен в файл)
         elif not output_file and result.get('html_content'):
-            print(f"\nHTML Content (first 500 chars):")
-            print("-" * 30)
-            print(result['html_content'][:500])
+            logger.info(f"\nHTML Content (first 500 chars):")
+            logger.info("-" * 30)
+            logger.info(result['html_content'][:500])
             if len(result['html_content']) > 500:
-                print("... (truncated)")
+                logger.info("... (truncated)")
     
     except Exception as e:
-        print(f"Error: {str(e)}")
+        logger.error(f"Error: {str(e)}")
         sys.exit(1)
 
 
@@ -112,14 +117,14 @@ async def batch_render(urls_file: str,
     with open(urls_file, 'r') as f:
         urls = [line.strip() for line in f if line.strip()]
     
-    print(f"Batch rendering {len(urls)} URLs...")
-    print(f"Output directory: {output_dir}")
-    print("-" * 50)
+    logger.info(f"Batch rendering {len(urls)} URLs...")
+    logger.info(f"Output directory: {output_dir}")
+    logger.info("-" * 50)
     
     results = []
     
     for i, url in enumerate(urls, 1):
-        print(f"\n[{i}/{len(urls)}] Processing: {url}")
+        logger.info(f"\n[{i}/{len(urls)}] Processing: {url}")
         
         try:
             result = await get_universal_html(
@@ -152,19 +157,19 @@ async def batch_render(urls_file: str,
             
             results.append(metadata)
             
-            print(f"  Source: {result.get('source')}")
-            print(f"  Title: {result.get('page_title', 'N/A')}")
-            print(f"  Content Length: {result.get('content_length', 0)} bytes")
-            print(f"  Render Time: {result.get('render_time', 0):.2f}s")
+            logger.info(f"  Source: {result.get('source')}")
+            logger.info(f"  Title: {result.get('page_title', 'N/A')}")
+            logger.info(f"  Content Length: {result.get('content_length', 0)} bytes")
+            logger.info(f"  Render Time: {result.get('render_time', 0):.2f}s")
             
             if result.get('escalation_reason'):
-                print(f"  Escalation: {result['escalation_reason']}")
+                logger.warning(f"  Escalation: {result['escalation_reason']}")
             
             if result.get('error'):
-                print(f"  Error: {result['error']}")
+                logger.error(f"  Error: {result['error']}")
         
         except Exception as e:
-            print(f"  Error: {str(e)}")
+            logger.error(f"  Error: {str(e)}")
             results.append({
                 'url': url,
                 'error': str(e)
@@ -175,9 +180,9 @@ async def batch_render(urls_file: str,
     with open(summary_file, 'w', encoding='utf-8') as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
     
-    print(f"\nBatch rendering completed!")
-    print(f"Results saved in: {output_dir}")
-    print(f"Summary: {summary_file}")
+    logger.info(f"\nBatch rendering completed!")
+    logger.info(f"Results saved in: {output_dir}")
+    logger.info(f"Summary: {summary_file}")
 
 
 def main():
@@ -235,13 +240,13 @@ Examples:
     
     # Показ конфигурации
     if args.config:
-        print("Current Configuration:")
-        print(json.dumps(config, indent=2))
+        logger.info("Current Configuration:")
+        logger.info(json.dumps(config, indent=2))
         return
     
     # Валидация конфигурации
     if not validate_config(config):
-        print("Error: Invalid configuration")
+        logger.error("Error: Invalid configuration")
         sys.exit(1)
     
     # Пакетный режим

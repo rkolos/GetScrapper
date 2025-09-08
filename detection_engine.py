@@ -382,8 +382,8 @@ if __name__ == "__main__":
     engine = DetectionEngine()
     
     for test_case in test_cases:
-        print(f"\n=== {test_case['name']} ===")
+        logger.info(f"\n=== {test_case['name']} ===")
         is_blocked, analysis = engine.analyze(test_case['data'])
-        print(f"Blocked: {is_blocked}")
-        print(f"Confidence: {analysis['confidence_score']:.2f}")
-        print(f"Reasons: {analysis['blocking_reasons']}")
+        logger.info(f"Blocked: {is_blocked}")
+        logger.info(f"Confidence: {analysis['confidence_score']:.2f}")
+        logger.info(f"Reasons: {analysis['blocking_reasons']}")
