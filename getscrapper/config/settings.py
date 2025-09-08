@@ -3,7 +3,7 @@
 import os
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from dotenv import load_dotenv
 
 from ..utils.exceptions import ConfigurationError
@@ -69,15 +69,15 @@ class LoggingConfig(BaseModel):
     log_file: Optional[str] = Field(default=None, description="Log file path")
     format: str = Field(default="%(asctime)s - %(name)s - %(levelname)s - %(message)s", description="Log format")
     
-    @validator('level')
+    @field_validator('level')
+    @classmethod
     def validate_level(cls, v):
         valid_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
         if v.upper() not in valid_levels:
             raise ValueError(f'Invalid logging level: {v}. Must be one of {valid_levels}')
         return v.upper()
     
-    class Config:
-        env_prefix = "GETSCRAPPER_LOG_"
+    model_config = ConfigDict(env_prefix="GETSCRAPPER_LOG_")
 
 
 class Settings(BaseModel):
@@ -148,7 +148,7 @@ class Settings(BaseModel):
         Returns:
             Settings as dictionary
         """
-        return self.dict()
+        return self.model_dump()
 
     def to_file(self, config_file: str) -> None:
         """
@@ -179,10 +179,10 @@ class Settings(BaseModel):
             Configuration dictionary for scraper
         """
         return {
-            "session": self.session.dict(),
-            "parser": self.parser.dict(),
-            "processor": self.processor.dict(),
-            "storage": self.storage.dict(),
+            "session": self.session.model_dump(),
+            "parser": self.parser.model_dump(),
+            "processor": self.processor.model_dump(),
+            "storage": self.storage.model_dump(),
             "output_dir": self.output_dir,
         }
 
