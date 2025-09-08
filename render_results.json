@@ -1,0 +1,26 @@
+[
+  {
+    "url": "https://example.com",
+    "source": "local",
+    "title": "Example Domain",
+    "content_length": 1248,
+    "render_time": 2.8003108501434326,
+    "escalated": false
+  },
+  {
+    "url": "https://httpbin.org/html",
+    "source": "local",
+    "title": "503 Service Temporarily Unavailable",
+    "content_length": 161,
+    "render_time": 2.5890755653381348,
+    "escalated": false
+  },
+  {
+    "url": "https://quotes.toscrape.com/js/",
+    "source": "local",
+    "title": "Quotes to Scrape",
+    "content_length": 8940,
+    "render_time": 2.765942335128784,
+    "escalated": false
+  }
+]
