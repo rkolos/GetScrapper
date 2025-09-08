@@ -1,6 +1,10 @@
 """Storage modules for different output formats."""
 
-from .csv_storage import CSVStorage
+try:
+    from .csv_storage import CSVStorage
+except ImportError:
+    from .simple_csv_storage import SimpleCSVStorage as CSVStorage
+
 from .json_storage import JSONStorage
 from .base_storage import BaseStorage
 

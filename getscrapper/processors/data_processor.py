@@ -4,7 +4,10 @@ import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
-from .validators import DataValidator, ScrapedDataModel, ValidationResult
+try:
+    from .validators import DataValidator, ScrapedDataModel, ValidationResult
+except ImportError:
+    from .simple_validators import DataValidator, SimpleScrapedDataModel as ScrapedDataModel, ValidationResult
 
 
 class DataProcessor:
